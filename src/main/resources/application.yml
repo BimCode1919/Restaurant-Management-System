@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: restaurant-qr-order
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/restaurant_qr_db
+    username: restaurant_user
+    password: restaurant_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+    open-in-view: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 60000
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+app:
+  jwt:
+    secret: MySecretKeyForRestaurantQROrderSystemMinimum256BitsLongForHS256Algorithm
+    expiration: 86400000
+    refresh-expiration: 604800000
+
+  qr:
+    base-url: http://localhost:3000
+    image-path: ./qr-codes/
+
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8080
+
+  file:
+    upload-dir: ./uploads/
+    max-size: 10485760
+
+logging:
+  level:
+    root: INFO
+    com.restaurant.qrorder: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
