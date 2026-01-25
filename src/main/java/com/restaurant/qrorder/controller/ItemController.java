@@ -1,11 +1,13 @@
 package com.restaurant.qrorder.controller;
 
+import com.restaurant.qrorder.domain.dto.request.CreateItemRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.ItemResponse;
 import com.restaurant.qrorder.service.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -73,6 +76,30 @@ public class ItemController {
                         .statusCode(HttpStatus.OK.value())
                         .message("Item retrieved successfully")
                         .data(itemService.getItemById(id))
+                        .build());
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create new item", description = "Create a new menu item (Admin only)")
+    public ResponseEntity<ApiResponse<ItemResponse>> createItem(@Valid @RequestBody CreateItemRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<ItemResponse>builder()
+                        .statusCode(HttpStatus.CREATED.value())
+                        .message("Item created successfully")
+                        .data(itemService.createItem(request))
+                        .build());
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete item", description = "Delete a menu item by ID (Admin only)")
+    public ResponseEntity<ApiResponse<Void>> deleteItem(@PathVariable Long id) {
+        itemService.deleteItem(id);
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Item deleted successfully")
                         .build());
     }
 

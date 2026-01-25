@@ -1,6 +1,8 @@
 package com.restaurant.qrorder.service;
 
+import com.restaurant.qrorder.domain.dto.request.CreateItemRequest;
 import com.restaurant.qrorder.domain.dto.response.ItemResponse;
+import com.restaurant.qrorder.domain.entity.Category;
 import com.restaurant.qrorder.domain.entity.Item;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.mapper.ItemMapper;
@@ -69,6 +71,33 @@ public class ItemService {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
         return itemMapper.toResponse(item);
+    }
+
+    @Transactional
+    public ItemResponse createItem(CreateItemRequest request) {
+        log.debug("Creating new item: {}", request.getName());
+        
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+
+        Item item = itemMapper.toEntity(request);
+        item.setCategory(category);
+        
+        Item savedItem = itemRepository.save(item);
+        log.info("Item created successfully with id: {}", savedItem.getId());
+        
+        return itemMapper.toResponse(savedItem);
+    }
+
+    @Transactional
+    public void deleteItem(Long id) {
+        log.debug("Deleting item with id: {}", id);
+        
+        Item item = itemRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
+        
+        itemRepository.delete(item);
+        log.info("Item deleted successfully with id: {}", id);
     }
 
     @Transactional(readOnly = true)
