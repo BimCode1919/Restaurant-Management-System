@@ -3,10 +3,13 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.dto.request.CreateItemRequest;
 import com.restaurant.qrorder.domain.dto.response.ItemResponse;
 import com.restaurant.qrorder.domain.entity.Category;
+import com.restaurant.qrorder.domain.entity.Discount;
 import com.restaurant.qrorder.domain.entity.Item;
+import com.restaurant.qrorder.domain.common.DiscountType;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.mapper.ItemMapper;
 import com.restaurant.qrorder.repository.CategoryRepository;
+import com.restaurant.qrorder.repository.DiscountRepository;
 import com.restaurant.qrorder.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -16,6 +19,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,6 +34,7 @@ public class ItemService {
 
     ItemRepository itemRepository;
     CategoryRepository categoryRepository;
+    DiscountRepository discountRepository;
     ItemMapper itemMapper;
 
     @Transactional(readOnly = true)
@@ -40,11 +46,11 @@ public class ItemService {
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
             
             return itemRepository.findByCategoryId(categoryId, pageable)
-                    .map(itemMapper::toResponse);
+                    .map(this::mapToResponseWithDiscounts);
         }
         
         return itemRepository.findAll(pageable)
-                .map(itemMapper::toResponse);
+                .map(this::mapToResponseWithDiscounts);
     }
 
     @Transactional(readOnly = true)
@@ -56,12 +62,12 @@ public class ItemService {
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
             
             return itemRepository.findAvailableItemsByCategory(categoryId).stream()
-                    .map(itemMapper::toResponse)
+                    .map(this::mapToResponseWithDiscounts)
                     .collect(Collectors.toList());
         }
         
         return itemRepository.findAllAvailableOrderByName().stream()
-                .map(itemMapper::toResponse)
+                .map(this::mapToResponseWithDiscounts)
                 .collect(Collectors.toList());
     }
 
@@ -70,7 +76,7 @@ public class ItemService {
         log.debug("Fetching item by id: {}", id);
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
-        return itemMapper.toResponse(item);
+        return mapToResponseWithDiscounts(item);
     }
 
     @Transactional
@@ -86,7 +92,7 @@ public class ItemService {
         Item savedItem = itemRepository.save(item);
         log.info("Item created successfully with id: {}", savedItem.getId());
         
-        return itemMapper.toResponse(savedItem);
+        return mapToResponseWithDiscounts(savedItem);
     }
 
     @Transactional
@@ -99,12 +105,70 @@ public class ItemService {
         itemRepository.delete(item);
         log.info("Item deleted successfully with id: {}", id);
     }
+    
+    private ItemResponse mapToResponseWithDiscounts(Item item) {
+        ItemResponse response = itemMapper.toResponse(item);
+        
+        List<ItemResponse.ActiveDiscountInfo> activeDiscounts = item.getDiscounts().stream()
+                .filter(discount -> discount.getDiscountType() == DiscountType.ITEM_SPECIFIC)
+                .filter(this::isDiscountActive)
+                .map(discount -> ItemResponse.ActiveDiscountInfo.builder()
+                        .discountId(discount.getId())
+                        .discountName(discount.getName())
+                        .discountValue(discount.getValue())
+                        .discountType(discount.getDiscountType().name())
+                        .build())
+                .collect(Collectors.toList());
+        
+        response.setActiveDiscounts(activeDiscounts);
+        
+        return response;
+    }
+    
+    private boolean isDiscountActive(Discount discount) {
+        if (!discount.getActive()) {
+            return false;
+        }
+        
+        LocalDateTime now = LocalDateTime.now();
+        
+        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
+            return false;
+        }
+        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
+            return false;
+        }
+        
+        if (discount.getDiscountType() == DiscountType.ITEM_SPECIFIC && discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()) {
+            String[] dayStrings = discount.getApplicableDays().split(",");
+            DayOfWeek today = now.getDayOfWeek();
+            
+            boolean isDayApplicable = false;
+            for (String dayStr : dayStrings) {
+                try {
+                    DayOfWeek day = DayOfWeek.valueOf(dayStr.trim().toUpperCase());
+                    if (day == today) {
+                        isDayApplicable = true;
+                        break;
+                    }
+                } catch (IllegalArgumentException e) {
+                    log.warn("Invalid day of week: {}", dayStr);
+                }
+            }
+            
+            if (!isDayApplicable) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
 
     @Transactional(readOnly = true)
     public Page<ItemResponse> searchItems(String keyword, Pageable pageable) {
         log.debug("Searching items with keyword: {}", keyword);
         return itemRepository.searchItems(keyword, pageable)
-                .map(itemMapper::toResponse);
+                .map(this::mapToResponseWithDiscounts);
     }
 }
 

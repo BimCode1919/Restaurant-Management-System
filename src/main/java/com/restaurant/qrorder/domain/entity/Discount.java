@@ -1,6 +1,7 @@
 package com.restaurant.qrorder.domain.entity;
 
 import com.restaurant.qrorder.domain.common.DiscountType;
+import com.restaurant.qrorder.domain.common.DiscountValueType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,12 +27,26 @@ public class Discount {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
+    private String name;
+
     @Column(name = "discount_type", nullable = false)
     @Enumerated(EnumType.STRING)
     private DiscountType discountType;
 
-    @Column(nullable = false)
+    @Column(name = "value_type", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private DiscountValueType valueType = DiscountValueType.PERCENTAGE;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal value;
+
+    @Column(name = "min_order_amount", precision = 10, scale = 2)
+    private BigDecimal minOrderAmount;
+
+    @Column(name = "max_discount_amount", precision = 10, scale = 2)
+    private BigDecimal maxDiscountAmount;
 
     @Column(name = "start_date")
     private LocalDateTime startDate;
@@ -41,6 +56,29 @@ public class Discount {
 
     @Column(length = 500)
     private String description;
+
+    @Column(name = "min_party_size")
+    private Integer minPartySize;
+
+    @Column(name = "max_party_size")
+    private Integer maxPartySize;
+
+    @Column(name = "tier_config", columnDefinition = "TEXT")
+    private String tierConfig;
+
+    @Column(name = "applicable_days", columnDefinition = "TEXT")
+    private String applicableDays;
+
+    @Column(name = "apply_to_specific_items")
+    @Builder.Default
+    private Boolean applyToSpecificItems = false;
+
+    @Column(name = "usage_limit")
+    private Integer usageLimit;
+
+    @Column(name = "used_count")
+    @Builder.Default
+    private Integer usedCount = 0;
 
     @Column(nullable = false)
     @Builder.Default

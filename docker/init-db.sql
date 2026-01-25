@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS discounts (
     name VARCHAR(255) NOT NULL,
     description VARCHAR(500),
     discount_type VARCHAR(50) NOT NULL,
+    value_type VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE',
     value DECIMAL(12,2) NOT NULL,
     min_order_amount DECIMAL(12,2),
     max_discount_amount DECIMAL(12,2),
@@ -103,10 +104,24 @@ CREATE TABLE IF NOT EXISTS discounts (
     end_date TIMESTAMP,
     usage_limit INTEGER,
     used_count INTEGER DEFAULT 0,
+    min_party_size INTEGER,
+    max_party_size INTEGER,
+    tier_config TEXT,
+    applicable_days TEXT,
+    apply_to_specific_items BOOLEAN DEFAULT false,
     active BOOLEAN DEFAULT true NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_discount_value_type CHECK (value_type IN ('PERCENTAGE', 'FIXED_AMOUNT', 'FIXED_PRICE'))
 );
+
+-- Add comments to discount columns
+COMMENT ON COLUMN discounts.value_type IS 'Type of discount value: PERCENTAGE (%), FIXED_AMOUNT (fixed discount), FIXED_PRICE (set item price)';
+COMMENT ON COLUMN discounts.min_party_size IS 'Minimum party size for PARTY_SIZE discount type';
+COMMENT ON COLUMN discounts.max_party_size IS 'Maximum party size for PARTY_SIZE discount type';
+COMMENT ON COLUMN discounts.tier_config IS 'JSON config for BILL_TIER discount: {"tier1":{"min":200000,"discount":10}}';
+COMMENT ON COLUMN discounts.applicable_days IS 'Applicable days for HOLIDAY discount: "MONDAY,FRIDAY" or "2026-01-01,2026-02-14"';
+COMMENT ON COLUMN discounts.apply_to_specific_items IS 'Flag to indicate if discount applies to specific items only';
 
 -- Bills table (must be created before orders due to foreign key)
 CREATE TABLE IF NOT EXISTS bills (
@@ -167,10 +182,16 @@ CREATE TABLE IF NOT EXISTS ingredient_usages (
 
 -- Discount Items (junction table)
 CREATE TABLE IF NOT EXISTS discount_items (
-    discount_id BIGINT NOT NULL REFERENCES discounts(id),
-    item_id BIGINT NOT NULL REFERENCES items(id),
-    PRIMARY KEY (discount_id, item_id)
+    discount_id BIGINT NOT NULL REFERENCES discounts(id) ON DELETE CASCADE,
+    item_id BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    PRIMARY KEY (discount_id, item_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_discounts_value_type ON discounts(value_type);
+CREATE INDEX IF NOT EXISTS idx_discount_items_discount_id ON discount_items(discount_id);
+CREATE INDEX IF NOT EXISTS idx_discount_items_item_id ON discount_items(item_id);
 
 -- Bills table (removed after table structure change)
 
@@ -284,11 +305,28 @@ INSERT INTO tables (id, table_number, qr_code, capacity, status, location, creat
 (10, '10', 'QR_TABLE_10_' || uuid_generate_v4(), 2, 'AVAILABLE', '2nd Floor - Balcony', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Discounts
-INSERT INTO discounts (id, code, name, description, discount_type, value, min_order_amount, max_discount_amount, start_date, end_date, usage_limit, used_count, active, created_at, updated_at) VALUES
-(1, 'WELCOME10', 'Welcome Discount', 'Giảm 10% cho khách hàng mới', 'PERCENTAGE', 10, 100000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 'FREESHIP', 'Free Shipping', 'Miễn phí vận chuyển đơn từ 200k', 'FIXED_AMOUNT', 30000, 200000, 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 200, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, 'LUNCH20', 'Lunch Special', 'Giảm 20% giờ vàng (11h-13h)', 'PERCENTAGE', 20, 150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 'HAPPY50K', 'Happy Hour', 'Giảm 50k cho đơn từ 300k', 'FIXED_AMOUNT', 50000, 300000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days', 50, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO discounts (id, code, name, description, discount_type, value_type, value, min_order_amount, max_discount_amount, start_date, end_date, usage_limit, used_count, active, created_at, updated_at) VALUES
+(1, 'WELCOME10', 'Welcome Discount', 'Giảm 10% cho khách hàng mới', 'PERCENTAGE', 'PERCENTAGE', 10, 100000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'FREESHIP', 'Free Shipping', 'Miễn phí vận chuyển đơn từ 200k', 'FIXED_AMOUNT', 'FIXED_AMOUNT', 30000, 200000, 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 200, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 'LUNCH20', 'Lunch Special', 'Giảm 20% giờ vàng (11h-13h)', 'PERCENTAGE', 'PERCENTAGE', 20, 150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 'HAPPY50K', 'Happy Hour', 'Giảm 50k cho đơn từ 300k', 'FIXED_AMOUNT', 'FIXED_AMOUNT', 50000, 300000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days', 50, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'SALE20', 'Flash Sale 20%', 'Giảm 20% tối đa 50k cho đơn từ 100k', 'PERCENTAGE', 'PERCENTAGE', 20, 100000, 50000, '2026-01-25 00:00:00', '2026-02-28 23:59:59', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 'PIZZA20', 'Pizza Sale 20%', 'Giảm 20% cho tất cả món Pizza', 'ITEM_SPECIFIC', 'PERCENTAGE', 20, NULL, NULL, '2026-01-25 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 'WEEKENDPARTY', 'Weekend Party 25%', 'Giảm 25% vào thứ 7, chủ nhật', 'HOLIDAY', 'PERCENTAGE', 25, 200000, 100000, '2026-02-01 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 'TET2026', 'Tet Holiday Sale', 'Giảm 30% dịp Tết Nguyên Đán', 'HOLIDAY', 'PERCENTAGE', 30, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 'GROUP4', 'Group Discount 4+ people', 'Giảm 10% cho nhóm 4-6 người', 'PARTY_SIZE', 'PERCENTAGE', 10, 200000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'GROUP7', 'Group Discount 7+ people', 'Giảm 15% cho nhóm 7-10 người', 'PARTY_SIZE', 'PERCENTAGE', 15, 7, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(11, 'BIGTIER', 'Spend More Save More', 'Giảm theo bậc: 5% (200k+), 10% (500k+), 15% (1M+)', 'BILL_TIER', 'PERCENTAGE', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 'FIXEDTIER', 'Fixed Discount Tiers', 'Giảm cố định: 20k (200k+), 60k (500k+), 150k (1M+)', 'BILL_TIER', 'FIXED_AMOUNT', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- Update specific discount configurations
+UPDATE discounts SET applicable_days = 'SATURDAY,SUNDAY' WHERE code = 'WEEKENDPARTY';
+UPDATE discounts SET applicable_days = '2026-01-01,2026-02-10,2026-02-11,2026-02-12' WHERE code = 'TET2026';
+UPDATE discounts SET min_party_size = 4, max_party_size = 6 WHERE code = 'GROUP4';
+UPDATE discounts SET min_party_size = 7, max_party_size = 10 WHERE code = 'GROUP7';
+UPDATE discounts SET tier_config = '{"tier1":{"min":200000,"discount":5},"tier2":{"min":500000,"discount":10},"tier3":{"min":1000000,"discount":15}}' WHERE code = 'BIGTIER';
+UPDATE discounts SET tier_config = '{"tier1":{"min":200000,"discount":20000},"tier2":{"min":500000,"discount":60000},"tier3":{"min":1000000,"discount":150000}}' WHERE code = 'FIXEDTIER';
+UPDATE discounts SET apply_to_specific_items = true WHERE code = 'PIZZA20';
 
 -- Reset sequences to proper values
 SELECT setval('roles_id_seq', (SELECT MAX(id) FROM roles));

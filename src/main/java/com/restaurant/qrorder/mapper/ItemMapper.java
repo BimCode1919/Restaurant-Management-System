@@ -10,12 +10,14 @@ import org.mapstruct.Mapping;
 public interface ItemMapper {
 
     @Mapping(source = "category.name", target = "categoryName")
+    @Mapping(target = "activeDiscounts", ignore = true)
     ItemResponse toResponse(Item item);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "recipes", ignore = true)
     @Mapping(target = "orderDetails", ignore = true)
+    @Mapping(target = "discounts", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Item toEntity(CreateItemRequest request);
