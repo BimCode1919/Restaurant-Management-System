@@ -37,9 +37,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints - Authentication APIs
+                        // Public endpoints - Authentication (no JWT required)
+                        .requestMatchers("/auth/**").permitAll()
+                        // Public endpoints - Swagger/OpenAPI
                         .requestMatchers(
-                                "/auth/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",
@@ -48,12 +49,7 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/error"
                         ).permitAll()
-                        // Public endpoints - Menu (Categories & Items)
-                        .requestMatchers(
-                                "/categories/**",              // View menu categories
-                                "/items/**"                    // View menu items
-                        ).permitAll()
-                        // All other requests require authentication
+                        // All other API endpoints require authentication (handled by @PreAuthorize in controllers)
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

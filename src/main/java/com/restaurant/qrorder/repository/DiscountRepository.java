@@ -20,4 +20,7 @@ public interface DiscountRepository extends JpaRepository<Discount, Long> {
            "(d.endDate IS NULL OR d.endDate >= :now) AND " +
            "(d.usageLimit IS NULL OR d.usedCount < d.usageLimit)")
     List<Discount> findActiveDiscounts(@Param("now") LocalDateTime now);
+
+    Optional<Discount> findByCode(String code);
 }
+

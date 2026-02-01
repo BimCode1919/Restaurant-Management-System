@@ -22,7 +22,7 @@ import static lombok.AccessLevel.PRIVATE;
 
 @Slf4j
 @RestController
-@RequestMapping("/batches")
+@RequestMapping("/ingredient-batches")
 @RequiredArgsConstructor
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @Tag(name = "Ingredient Batch Management", description = "APIs for managing ingredient batches")

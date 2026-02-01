@@ -30,6 +30,9 @@ public class Discount {
     @Column(nullable = false)
     private String name;
 
+    @Column(unique = true, nullable = false, length = 100)
+    private String code;
+
     @Column(name = "discount_type", nullable = false)
     @Enumerated(EnumType.STRING)
     private DiscountType discountType;

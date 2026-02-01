@@ -53,6 +53,15 @@ app:
     upload-dir: ./uploads/
     max-size: 10485760
 
+# MoMo Payment Gateway Configuration
+momo:
+  partner-code: ${MOMO_PARTNER_CODE:MOMO_PARTNER_CODE}
+  access-key: ${MOMO_ACCESS_KEY:MOMO_ACCESS_KEY}
+  secret-key: ${MOMO_SECRET_KEY:MOMO_SECRET_KEY}
+  endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api/create}
+  return-url: ${MOMO_RETURN_URL:http://localhost:8080/api/payments/momo/return}
+  notify-url: ${MOMO_NOTIFY_URL:http://localhost:8080/api/payments/momo/notify}
+
 logging:
   level:
     root: INFO

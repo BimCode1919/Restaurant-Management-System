@@ -29,10 +29,34 @@ public class Bill {
     @Builder.Default
     private BigDecimal totalPrice = BigDecimal.ZERO;
 
+    @Column(name = "party_size")
+    private Integer partySize;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discount_id")
+    private Discount discount;
+
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "final_price", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal finalPrice = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private BillStatus status = BillStatus.OPEN;
+
+    // Link to reservation if this bill is from a reservation
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reservation_id")
+    private Reservation reservation;
+
+    // Payment information
+    @OneToOne(mappedBy = "bill", cascade = CascadeType.ALL)
+    private Payment payment;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

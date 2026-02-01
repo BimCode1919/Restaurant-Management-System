@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "tables")
@@ -35,7 +33,17 @@ public class RestaurantTable {
     @Column(name = "qr_code", unique = true)
     private String qrCode;
 
+    @Column(nullable = false)
+    private Integer capacity;
+
+    @Column(length = 255)
+    private String location;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }
+

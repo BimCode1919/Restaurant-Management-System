@@ -39,7 +39,7 @@ Mở trình duyệt: **http://localhost:8080/api/swagger-ui.html**
 ## Tài khoản mặc định
 
 **Admin**: admin@restaurant.com / admin123  
-**Staff**: staff@restaurant.com / staff123
+**Staff**: staff@restaurant.com / admin123
 
 ## Dữ liệu mẫu
 

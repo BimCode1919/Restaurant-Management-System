@@ -38,4 +38,7 @@ public class DiscountResponse {
     private Boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // Calculated field - used when finding best discount for a bill
+    private BigDecimal calculatedAmount;
 }

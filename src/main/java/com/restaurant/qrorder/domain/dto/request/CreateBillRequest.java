@@ -1,7 +1,6 @@
 package com.restaurant.qrorder.domain.dto.request;
 
-import com.restaurant.qrorder.domain.common.OrderType;
-import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -15,14 +14,14 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateOrderRequest {
+public class CreateBillRequest {
     
-    @NotNull(message = "Bill ID is required")
-    private Long billId;
+    @NotEmpty(message = "At least one table is required")
+    private List<Long> tableIds;
     
-    private OrderType orderType;
+    @NotNull(message = "Party size is required")
+    @Min(value = 1, message = "Party size must be at least 1")
+    private Integer partySize;
     
-    @NotEmpty(message = "At least one item is required")
-    @Valid
-    private List<OrderDetailRequest> items;
+    private Long reservationId;
 }

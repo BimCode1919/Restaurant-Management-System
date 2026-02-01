@@ -1,0 +1,34 @@
+spring.application.name=Restaurant QR Order System - Test
+
+# Test Database (will be overridden by TestContainers)
+spring.datasource.url=jdbc:postgresql://localhost:5432/test_restaurant_qr_db
+spring.datasource.username=test_user
+spring.datasource.password=test_password
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA Configuration for Testing
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# Redis Configuration for Testing (use embedded or mock)
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+spring.cache.type=none
+
+# JWT Configuration for Testing
+jwt.secret=test-secret-key-for-testing-purposes-only-do-not-use-in-production
+jwt.expiration=3600000
+
+# Logging for Tests
+logging.level.root=INFO
+logging.level.com.restaurant.qrorder=DEBUG
+logging.level.org.springframework.web=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+# Test specific properties
+spring.test.database.replace=none
+spring.sql.init.mode=never
