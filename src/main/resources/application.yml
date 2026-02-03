@@ -4,13 +4,19 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/restaurant_qr_db
-    username: restaurant_user
-    password: restaurant_pass
+    username: postgres
+    password: 123456
     driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true  # Critical for existing databases
+    baseline-version: 0  # Optional: version number for the baseline
+    locations: classpath:db/migration
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -32,7 +38,7 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: 8080
+  port: 8081
   servlet:
     context-path: /api
 
@@ -42,12 +48,13 @@ app:
     expiration: 86400000
     refresh-expiration: 604800000
 
+
   qr:
     base-url: http://localhost:3000
     image-path: ./qr-codes/
 
   cors:
-    allowed-origins: http://localhost:3000,http://localhost:8080
+    allowed-origins: http://localhost:3000,http://localhost:8081
 
   file:
     upload-dir: ./uploads/
@@ -59,8 +66,8 @@ momo:
   access-key: ${MOMO_ACCESS_KEY:MOMO_ACCESS_KEY}
   secret-key: ${MOMO_SECRET_KEY:MOMO_SECRET_KEY}
   endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api/create}
-  return-url: ${MOMO_RETURN_URL:http://localhost:8080/api/payments/momo/return}
-  notify-url: ${MOMO_NOTIFY_URL:http://localhost:8080/api/payments/momo/notify}
+  return-url: ${MOMO_RETURN_URL:http://localhost:8081/api/payments/momo/return}
+  notify-url: ${MOMO_NOTIFY_URL:http://localhost:8081/api/payments/momo/notify}
 
 logging:
   level:
@@ -75,3 +82,4 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+

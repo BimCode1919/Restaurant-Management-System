@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: duc
+      changes:
+        - dropCheckConstraint:
+            constraintName: discount_discount_type_check
+            tableName: discounts
+        - addCheckConstraint:
+            constraintName: discount_type_check
+            tableName: discounts
+            checkConstraint: "discount_type IN ('ITEM_SPECIFIC', 'HOLIDAY', 'PARTY_SIZE', 'BILL_TIER')"
+
