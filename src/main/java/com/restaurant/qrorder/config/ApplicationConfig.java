@@ -1,6 +1,8 @@
 package com.restaurant.qrorder.config;
 
 import com.restaurant.qrorder.repository.UserRepository;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

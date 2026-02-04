@@ -4,13 +4,19 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/restaurant_qr_db
-    username: restaurant_user
-    password: restaurant_pass
+    username: restaurant_user #postgres
+    password: restaurant_pass #123456
     driver-class-name: org.postgresql.Driver
+
+#  flyway:
+#    enabled: true
+#    baseline-on-migrate: true  # Critical for existing databases
+#    baseline-version: 0  # Optional: version number for the baseline
+#    locations: classpath:db/migration
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -41,6 +47,7 @@ app:
     secret: MySecretKeyForRestaurantQROrderSystemMinimum256BitsLongForHS256Algorithm
     expiration: 86400000
     refresh-expiration: 604800000
+
 
   qr:
     base-url: http://localhost:3000
@@ -75,3 +82,4 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+
