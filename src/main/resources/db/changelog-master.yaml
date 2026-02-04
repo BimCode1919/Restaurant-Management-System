@@ -1,13 +1,21 @@
-databaseChangeLog:
-  - changeSet:
-      id: 1
-      author: duc
-      changes:
-        - dropCheckConstraint:
-            constraintName: discount_discount_type_check
-            tableName: discounts
-        - addCheckConstraint:
-            constraintName: discount_type_check
-            tableName: discounts
-            checkConstraint: "discount_type IN ('ITEM_SPECIFIC', 'HOLIDAY', 'PARTY_SIZE', 'BILL_TIER')"
+#databaseChangeLog:
+#  - changeSet:
+#      id: 1
+#      author: duc
+#      changes:
+#        - dropCheckConstraint:
+#            constraintName: discount_discount_type_check
+#            tableName: discounts
+#        - addCheckConstraint:
+#            constraintName: discount_type_check
+#            tableName: discounts
+#            checkConstraint: "discount_type IN ('ITEM_SPECIFIC', 'HOLIDAY', 'PARTY_SIZE', 'BILL_TIER')"
 
+# Update discount_type so that in database discount_type match in code
+#SELECT
+#    conname,
+#    pg_get_constraintdef(c.oid)
+#FROM pg_constraint c
+#JOIN pg_class t ON c.conrelid = t.oid
+#WHERE t.relname = 'discounts'
+#  AND conname = 'discounts_discount_type_check'; use this to check if it there
