@@ -35,32 +35,4 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
-
-    @Query("""
-        SELECT DISTINCT t FROM Reservation r
-        JOIN r.tables t
-        WHERE r.reservationTime BETWEEN :start AND :end
-        AND r.status NOT IN ('PENDING', 'SEATED', 'CONFIRMED')
-    """)
-    List<RestaurantTable> findReservedTablesForTimePeriod(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
-    );
-
-//    @Query("""
-//        SELECT t FROM RestaurantTable t
-//        WHERE t.status = 'AVAILABLE'
-//        AND t.id NOT IN (
-//            SELECT rt.id FROM Reservation r JOIN r.tables rt
-//            WHERE r.status NOT IN ('CANCELLED', 'PENDING', 'SEATED')
-//        )
-//        AND t.status != ''
-//    """)
-//    List<RestaurantTable> findAvailableTablesInTimePeriod(
-//            @Param("start") LocalDateTime start,
-//            @Param("end") LocalDateTime end
-//    );
-
-
-
 }

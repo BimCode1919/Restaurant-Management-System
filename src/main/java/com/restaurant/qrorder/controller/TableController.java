@@ -13,13 +13,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -33,7 +31,7 @@ import static lombok.AccessLevel.PRIVATE;
 @SecurityRequirement(name = "bearerAuth")
 public class TableController {
 
-    private final TableService tableService;
+    TableService tableService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
@@ -44,22 +42,6 @@ public class TableController {
                         .statusCode(HttpStatus.OK.value())
                         .message("Tables retrieved successfully")
                         .data(tableService.getAllTables())
-                        .build());
-    }
-
-    @GetMapping("/by-date")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER')")
-    @Operation(summary = "Get all tables by date", description = "Retrieve all tables with availability status for a specific date.")
-    public ResponseEntity<ApiResponse<List<TableResponse>>> getAllTablesByDate(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        LocalDate targetDate = date != null ? date : LocalDate.now();
-
-        return ResponseEntity.ok(
-                ApiResponse.<List<TableResponse>>builder()
-                        .statusCode(HttpStatus.OK.value())
-                        .message("Tables retrieved successfully for date: " + targetDate)
-                        .data(tableService.getAllTablesByDate(targetDate))
                         .build());
     }
 

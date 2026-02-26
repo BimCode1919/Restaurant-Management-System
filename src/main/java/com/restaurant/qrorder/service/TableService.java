@@ -4,12 +4,10 @@ import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateTableRequest;
 import com.restaurant.qrorder.domain.dto.request.UpdateTableRequest;
 import com.restaurant.qrorder.domain.dto.response.TableResponse;
-import com.restaurant.qrorder.domain.entity.Reservation;
 import com.restaurant.qrorder.domain.entity.RestaurantTable;
 import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
-import com.restaurant.qrorder.repository.ReservationRepository;
 import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -17,11 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,42 +27,16 @@ import static lombok.AccessLevel.PRIVATE;
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 public class TableService {
 
-    private final RestaurantTableRepository tableRepository;
-    private final ReservationRepository reservationRepository;
+    RestaurantTableRepository tableRepository;
 
     /**
      * Get all tables
      */
     @Transactional(readOnly = true)
-        public List<TableResponse> getAllTables() {
+    public List<TableResponse> getAllTables() {
         log.debug("Fetching all tables");
         return tableRepository.findAll().stream()
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<TableResponse> getAllTablesByDate(LocalDate date) {
-        log.debug("Fetching all tables");
-
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-
-        Set<Long> reservedTableIds = tableRepository
-                .findReservedTablesForTimePeriod(startOfDay, endOfDay)
-                .stream()
-                .map(RestaurantTable::getId)
-                .collect(Collectors.toSet());
-
-
-
-        return tableRepository.findByStatus(TableStatus.AVAILABLE).stream()
-                .map(table -> {
-                    TableStatus dynamicStatus = reservedTableIds.contains(table.getId())
-                            ? TableStatus.RESERVED
-                            : table.getStatus();
-                    return mapToResponseTable(table, dynamicStatus);
-                })
                 .collect(Collectors.toList());
     }
 
@@ -257,17 +225,6 @@ public class TableService {
                 .qrCode(table.getQrCode())
                 .createdAt(table.getCreatedAt())
                 .updatedAt(table.getUpdatedAt())
-                .build();
-    }
-
-    private TableResponse mapToResponseTable(RestaurantTable table, TableStatus dynamicStatus) {
-        return TableResponse.builder()
-                .id(table.getId())
-                .tableNumber(table.getTableNumber())
-                .status(dynamicStatus)  // overrides DB status
-                .capacity(table.getCapacity())
-                .location(table.getLocation())
-                .qrCode(table.getQrCode())
                 .build();
     }
 }

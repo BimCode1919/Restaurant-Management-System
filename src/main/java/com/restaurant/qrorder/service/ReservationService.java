@@ -59,8 +59,8 @@ public class ReservationService {
                 .tables(tables)
                 .build();
 
-
-//        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
+        // Mark tables as reserved
+        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
         tableRepository.saveAll(tables);
 
         Reservation saved = reservationRepository.save(reservation);
