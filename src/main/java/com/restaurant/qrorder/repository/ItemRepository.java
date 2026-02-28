@@ -1,9 +1,11 @@
 package com.restaurant.qrorder.repository;
 
 import com.restaurant.qrorder.domain.entity.Item;
+import com.restaurant.qrorder.util.ItemSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ItemRepository extends JpaRepository<Item, Long> {
+public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificationExecutor<Item> {
 
     @Query("SELECT i FROM Item i LEFT JOIN FETCH i.category WHERE i.id = :id")
     Optional<Item> findByIdWithCategory(Long id);
@@ -33,4 +35,5 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     @Query("SELECT i FROM Item i WHERE i.category.id = :categoryId AND i.available = true")
     List<Item> findAvailableItemsByCategory(Long categoryId);
+
 }

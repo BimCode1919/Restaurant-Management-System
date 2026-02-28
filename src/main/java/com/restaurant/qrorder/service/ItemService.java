@@ -6,22 +6,26 @@ import com.restaurant.qrorder.domain.entity.Category;
 import com.restaurant.qrorder.domain.entity.Discount;
 import com.restaurant.qrorder.domain.entity.Item;
 import com.restaurant.qrorder.domain.common.DiscountType;
+import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.mapper.ItemMapper;
 import com.restaurant.qrorder.repository.CategoryRepository;
 import com.restaurant.qrorder.repository.DiscountRepository;
 import com.restaurant.qrorder.repository.ItemRepository;
+import com.restaurant.qrorder.util.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -81,6 +85,10 @@ public class ItemService {
 
     @Transactional
     public ItemResponse createItem(CreateItemRequest request) {
+       if(getDuplicated(request.getName()))
+       {
+          throw new DuplicateResourceException("Duplicated resource error. Item with that name already exist");
+       }
         log.debug("Creating new item: {}", request.getName());
         
         Category category = categoryRepository.findById(request.getCategoryId())
@@ -169,6 +177,18 @@ public class ItemService {
         log.debug("Searching items with keyword: {}", keyword);
         return itemRepository.searchItems(keyword, pageable)
                 .map(this::mapToResponseWithDiscounts);
+    }
+
+    public Boolean getDuplicated(String name) {
+        log.debug("Checking for duplicated items with matching id and name. Name: {}", name);
+        List<Item> found = itemRepository.findAll(ItemSpecification.getItemByIdAndName(name.trim()));
+        if(!found.isEmpty())
+        {
+            log.error("Duplicate found! Exit item creation.");
+            return true;
+        }
+        else
+            return false;
     }
 }
 
