@@ -11,11 +11,11 @@ spring:
     password: restaurant_pass #123456
     driver-class-name: org.postgresql.Driver
 
-#  flyway:
-#    enabled: true
-#    baseline-on-migrate: true  # Critical for existing databases
-#    baseline-version: 0  # Optional: version number for the baseline
-#    locations: classpath:db/migration
+  flyway:
+    enabled: true
+    baseline-on-migrate: true  # Critical for existing databases
+    baseline-version: 0  # Optional: version number for the baseline
+    locations: classpath:db/migration
 
   jpa:
     hibernate:
