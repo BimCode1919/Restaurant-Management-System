@@ -166,6 +166,7 @@ public class OrderService {
                 .quantity(detail.getQuantity())
                 .price(detail.getPrice())
                 .subtotal(subtotal)
+                .itemStatus(detail.getItemStatus())
                 .notes(detail.getNote())
                 .build();
     }
