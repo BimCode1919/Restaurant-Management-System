@@ -2,9 +2,6 @@ spring:
   application:
     name: restaurant-qr-order
 
-  flyway:
-    baseline-on-migrate: true
-
   datasource:
     url: jdbc:postgresql://localhost:5432/restaurant_qr_db
     username: restaurant_user #postgres
