@@ -32,7 +32,7 @@ public class PaymentController {
      * Create payment for a bill
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Create payment", description = "Create a new payment for a bill (Authenticated users)")
     public ResponseEntity<PaymentResponse> createPayment(@Valid @RequestBody CreatePaymentRequest request) {
         PaymentResponse response = paymentService.createPayment(request);
@@ -43,7 +43,7 @@ public class PaymentController {
      * Get payment by ID
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get payment by ID", description = "Retrieve payment details (Admin/Staff only)")
     public ResponseEntity<PaymentResponse> getPayment(@PathVariable Long id) {
         PaymentResponse response = paymentService.checkPaymentStatus(id);
@@ -54,7 +54,7 @@ public class PaymentController {
      * Get payment by Bill ID
      */
     @GetMapping("/bill/{billId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get payment by Bill ID", description = "Retrieve payment by bill ID (Admin/Staff only)")
     public ResponseEntity<PaymentResponse> getPaymentByBillId(@PathVariable Long billId) {
         PaymentResponse response = paymentService.getPaymentByBillId(billId);
@@ -65,7 +65,7 @@ public class PaymentController {
      * Check payment status
      */
     @GetMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Check payment status", description = "Check current payment status (Authenticated users)")
     public ResponseEntity<PaymentResponse> checkPaymentStatus(@PathVariable Long id) {
         PaymentResponse response = paymentService.checkPaymentStatus(id);

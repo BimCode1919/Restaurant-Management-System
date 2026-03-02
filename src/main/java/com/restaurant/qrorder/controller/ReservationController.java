@@ -113,7 +113,7 @@ public class ReservationController {
      * Cancel reservation
      */
     @PutMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Cancel reservation", description = "Cancel a reservation (Admin/Staff only)")
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable Long id,
@@ -127,7 +127,7 @@ public class ReservationController {
      * Mark reservation as no-show
      */
     @PutMapping("/{id}/no-show")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Mark as no-show", description = "Mark reservation as no-show (Admin/Staff only)")
     public ResponseEntity<ReservationResponse> markAsNoShow(
             @PathVariable Long id,

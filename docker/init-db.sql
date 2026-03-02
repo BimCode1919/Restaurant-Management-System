@@ -267,8 +267,8 @@ INSERT INTO roles (id, name) VALUES
 (2, 'STAFF'),
 (3, 'CHEF'),
 (4, 'CUSTOMER'),
-(4, 'CASHIER'),
-(5, 'MANAGER');
+(5, 'CASHIER'),
+(6, 'MANAGER');
 
 -- Users (password: admin123, admin123, admin123)
 -- Hash generated with BCryptPasswordEncoder for "admin123"
@@ -276,8 +276,8 @@ INSERT INTO users (id, email, password, full_name, phone, role_id, active, creat
 (1, 'admin@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Administrator', '0901234567', 1, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 'staff@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Staff Member', '0901234568', 2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (3, 'chef@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Head Chef', '0901234569', 3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 'cashier@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Cashier', '0901234449', 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(5, 'manager@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Manager', '0901231239', 5, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+(4, 'cashier@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Cashier', '0901234449', 5, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'manager@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Manager', '0901231239', 6, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Categories
 INSERT INTO categories (id, name, description) VALUES

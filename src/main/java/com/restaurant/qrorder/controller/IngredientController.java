@@ -33,7 +33,7 @@ public class IngredientController {
     IngredientService ingredientService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'MANAGER')")
     @Operation(summary = "Get all ingredients", description = "Retrieve all ingredients (Admin manages, Chef views)")
     public ResponseEntity<ApiResponse<List<IngredientResponse>>> getAllIngredients() {
         return ResponseEntity.ok(
@@ -45,7 +45,7 @@ public class IngredientController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'MANAGER')")
     @Operation(summary = "Get ingredient by ID", description = "Retrieve a specific ingredient by its ID (Admin manages, Chef views)")
     public ResponseEntity<ApiResponse<IngredientResponse>> getIngredientById(@PathVariable Long id) {
         return ResponseEntity.ok(

@@ -29,7 +29,7 @@ public class BillController {
     private final BillService billService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Create bill", description = "Create a new bill for tables (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> createBill(@Valid @RequestBody CreateBillRequest request) {
         BillResponse response = billService.createBill(request);
@@ -42,7 +42,7 @@ public class BillController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER')")
     @Operation(summary = "Get bill by ID", description = "Retrieve bill details")
     public ResponseEntity<ApiResponse<BillResponse>> getBillById(@PathVariable Long id) {
         BillResponse response = billService.getBillResponseById(id);
@@ -55,7 +55,7 @@ public class BillController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Get all bills", description = "Retrieve all bills or filter by status (Admin/Staff only)")
     public ResponseEntity<ApiResponse<List<BillResponse>>> getAllBills(
             @RequestParam(required = false) BillStatus status) {
@@ -73,7 +73,7 @@ public class BillController {
     }
 
     @PostMapping("/{id}/apply-discount")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Apply discount to bill", description = "Apply a discount to the bill (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> applyDiscount(
             @PathVariable Long id,
@@ -91,7 +91,7 @@ public class BillController {
     }
 
     @PostMapping("/{id}/apply-best-discount")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Apply best discount", description = "Automatically apply the best available discount (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> applyBestDiscount(@PathVariable Long id) {
         billService.applyBestDiscount(id);
@@ -106,7 +106,7 @@ public class BillController {
     }
 
     @DeleteMapping("/{id}/discount")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Remove discount", description = "Remove discount from bill (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> removeDiscount(@PathVariable Long id) {
         billService.removeDiscount(id);
@@ -121,7 +121,7 @@ public class BillController {
     }
 
     @PutMapping("/{id}/close")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Close bill", description = "Close a paid bill and release tables (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> closeBill(@PathVariable Long id) {
         BillResponse response = billService.closeBill(id);

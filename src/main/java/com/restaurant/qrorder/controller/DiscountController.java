@@ -36,7 +36,7 @@ public class DiscountController {
     BillService billService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Get all discounts", description = "Retrieve all discounts (Admin/Staff only)")
     public ResponseEntity<ApiResponse<List<DiscountResponse>>> getAllDiscounts() {
         return ResponseEntity.ok(
@@ -59,7 +59,7 @@ public class DiscountController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Get discount by ID", description = "Retrieve a specific discount by its ID")
     public ResponseEntity<ApiResponse<DiscountResponse>> getDiscountById(@PathVariable Long id) {
         return ResponseEntity.ok(
@@ -71,7 +71,7 @@ public class DiscountController {
     }
 
     @GetMapping("/code/{code}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Get discount by code", description = "Retrieve a specific discount by its code")
     public ResponseEntity<ApiResponse<DiscountResponse>> getDiscountByCode(@PathVariable String code) {
         return ResponseEntity.ok(
@@ -152,7 +152,7 @@ public class DiscountController {
     }
 
     @PostMapping("/calculate/{billId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Calculate best discount for bill", 
                description = "Find and calculate the best applicable discount for a specific bill")
     public ResponseEntity<ApiResponse<DiscountResponse>> calculateBestDiscount(@PathVariable Long billId) {
@@ -175,7 +175,7 @@ public class DiscountController {
     }
 
     @PostMapping("/apply/{billId}/{discountId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Apply discount to bill", 
                description = "Apply a specific discount to a bill")
     public ResponseEntity<ApiResponse<Void>> applyDiscountToBill(
@@ -192,7 +192,7 @@ public class DiscountController {
     }
 
     @PostMapping("/apply-best/{billId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Apply best discount to bill", 
                description = "Automatically find and apply the best discount to a bill")
     public ResponseEntity<ApiResponse<Void>> applyBestDiscount(@PathVariable Long billId) {
@@ -206,7 +206,7 @@ public class DiscountController {
     }
 
     @DeleteMapping("/remove/{billId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
     @Operation(summary = "Remove discount from bill", 
                description = "Remove the currently applied discount from a bill")
     public ResponseEntity<ApiResponse<Void>> removeDiscountFromBill(@PathVariable Long billId) {
