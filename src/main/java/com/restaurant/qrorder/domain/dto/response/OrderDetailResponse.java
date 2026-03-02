@@ -1,5 +1,6 @@
 package com.restaurant.qrorder.domain.dto.response;
 
+import com.restaurant.qrorder.domain.common.ItemStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,5 +20,6 @@ public class OrderDetailResponse {
     private Integer quantity;
     private BigDecimal price;
     private BigDecimal subtotal;
+    private ItemStatus itemStatus;
     private String notes;
 }
