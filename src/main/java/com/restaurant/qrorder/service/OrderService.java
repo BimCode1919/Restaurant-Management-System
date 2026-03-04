@@ -1,5 +1,6 @@
 package com.restaurant.qrorder.service;
 
+import com.restaurant.qrorder.domain.common.ItemStatus;
 import com.restaurant.qrorder.domain.common.OrderType;
 import com.restaurant.qrorder.domain.dto.request.CreateOrderRequest;
 import com.restaurant.qrorder.domain.dto.request.OrderDetailRequest;
@@ -50,7 +51,16 @@ public class OrderService {
         String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
+        String roleName = user.getRole().getName().name(); // e.g. CUSTOMER, STAFF
+
+        ItemStatus itemStatus = null;
+       if ("STAFF".equalsIgnoreCase(roleName)) {
+            itemStatus = ItemStatus.PREPARING;
+        } else {
+            itemStatus = ItemStatus.PENDING;
+        }
+
         // Create order
         Order order = Order.builder()
                 .bill(bill)
@@ -69,13 +79,18 @@ public class OrderService {
             if (!item.getAvailable()) {
                 throw new InvalidOperationException("Item " + item.getName() + " is not available");
             }
-            
+
+            if(itemStatus == null) {
+                throw new RuntimeException("Item status is null!!!");
+            }
+
             OrderDetail detail = OrderDetail.builder()
                     .order(savedOrder)
                     .item(item)
                     .quantity(itemRequest.getQuantity())
                     .price(item.getPrice())
                     .note(itemRequest.getNotes())
+                    .itemStatus(itemStatus)
                     .build();
             
             savedOrder.getOrderDetails().add(detail);
@@ -128,7 +143,7 @@ public class OrderService {
         }
         
         orderRepository.delete(order);
-        
+
         // Recalculate bill totals
         billService.recalculateBill(bill.getId());
         

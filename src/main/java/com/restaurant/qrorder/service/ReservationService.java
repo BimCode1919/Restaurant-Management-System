@@ -1,10 +1,13 @@
 package com.restaurant.qrorder.service;
 
+import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.common.ReservationStatus;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.domain.entity.*;
+import com.restaurant.qrorder.exception.custom.InvalidOperationException;
+import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +15,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +29,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final RestaurantTableRepository tableRepository;
     private final UserRepository userRepository;
+    private final BillRepository billRepository;
 
     /**
      * Tạo reservation mới
@@ -68,6 +74,80 @@ public class ReservationService {
         log.info("Created reservation ID: {} for customer: {}", saved.getId(), saved.getCustomerName());
 
         return mapToResponse(saved);
+    }
+
+    @Transactional
+    public ReservationResponse createReservationAndBill(CreateReservationRequest request, Long userId) {
+        // Validate reservation time
+        validateReservationTime(request.getReservationTime());
+
+        // Check table availability
+        List<RestaurantTable> tables = findAndValidateTables(
+                request.getRequestedTableIds(),
+                request.getPartySize(),
+                request.getReservationTime()
+        );
+
+
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+
+
+        // Create reservation
+        Reservation reservation = Reservation.builder()
+                .customerName(request.getCustomerName())
+                .customerPhone(request.getCustomerPhone())
+                .customerEmail(request.getCustomerEmail())
+                .partySize(request.getPartySize())
+                .reservationTime(request.getReservationTime())
+                .status(ReservationStatus.PENDING)
+                .note(request.getNote())
+                .depositRequired(request.getDepositRequired() != null ? request.getDepositRequired() : false)
+                .depositAmount(request.getDepositAmount())
+                .depositPaid(false)
+                .createdBy(user)
+                .tables(tables)
+                .build();
+
+
+
+//        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
+        Reservation savedReservation = reservationRepository.save(reservation);
+
+        Bill bill = Bill.builder()
+                .totalPrice(savedReservation.getDepositAmount())
+                .partySize(request.getPartySize())
+                .discountAmount(BigDecimal.ZERO)
+                .finalPrice(BigDecimal.ZERO)
+                .status(BillStatus.OPEN)
+                .billTables(new ArrayList<>())
+                .orders(new ArrayList<>())
+                .reservation(savedReservation)
+                .build();
+
+
+        Bill savedBill = billRepository.save(bill);
+        savedReservation.setBill(savedBill);
+        savedReservation = reservationRepository.save(reservation);
+
+
+        // Create bill-table associations and update table status
+        for (RestaurantTable table : tables) {
+            BillTable billTable = BillTable.builder()
+                    .id(new BillTable.BillTableId(savedBill.getId(), table.getId()))
+                    .bill(savedBill)
+                    .table(table)
+                    .build();
+            savedBill.getBillTables().add(billTable);
+        }
+        tableRepository.saveAll(tables);
+        billRepository.save(savedBill);
+
+        log.info("Created reservation ID: {} for customer: {}", savedReservation.getId(), savedReservation.getCustomerName());
+
+        return mapToResponse(savedReservation);
     }
 
     /**
