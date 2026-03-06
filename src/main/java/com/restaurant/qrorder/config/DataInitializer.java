@@ -52,6 +52,13 @@ public class DataInitializer {
                     "0900000003",
                     UserRole.CUSTOMER
             );
+
+            createUserIfNotExists(
+                    "chef@test.com",
+                    "Chef Test User",
+                    "09000000032",
+                    UserRole.CHEF
+            );
         };
     }
 
