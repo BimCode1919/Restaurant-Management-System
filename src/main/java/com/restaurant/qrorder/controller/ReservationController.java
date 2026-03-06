@@ -46,6 +46,19 @@ public class ReservationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/bill")
+    @Operation(summary = "Create reservation and auto make bill", description = "Create a new restaurant reservation and bill (Authenticated users)")
+    public ResponseEntity<ReservationResponse> createReservationAndBIll(
+            @Valid @RequestBody CreateReservationRequest request,
+            Authentication authentication) {
+
+        // Get user ID from authentication
+        Long userId = getUserIdFromAuth(authentication);
+
+        ReservationResponse response = reservationService.createReservationAndBill(request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     /**
      * Get reservation by ID
      */
