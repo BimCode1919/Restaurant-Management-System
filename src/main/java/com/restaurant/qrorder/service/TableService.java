@@ -3,12 +3,15 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateTableRequest;
 import com.restaurant.qrorder.domain.dto.request.UpdateTableRequest;
+import com.restaurant.qrorder.domain.dto.response.BillResponse;
 import com.restaurant.qrorder.domain.dto.response.TableResponse;
+import com.restaurant.qrorder.domain.entity.Bill;
 import com.restaurant.qrorder.domain.entity.Reservation;
 import com.restaurant.qrorder.domain.entity.RestaurantTable;
 import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
+import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.ReservationRepository;
 import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,7 @@ public class TableService {
 
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+    private final BillRepository billRepository;
 
     /**
      * Get all tables
@@ -248,9 +252,14 @@ public class TableService {
      * Map entity to response DTO
      */
     private TableResponse mapToResponse(RestaurantTable table) {
+        Bill currentBill = billRepository
+                .findCurrentBillByTableId(table.getId())
+                .orElse(null);
+
         return TableResponse.builder()
                 .id(table.getId())
                 .tableNumber(table.getTableNumber())
+                .currentBill(mapToBillResponse(currentBill))
                 .capacity(table.getCapacity())
                 .status(table.getStatus())
                 .location(table.getLocation())
@@ -268,6 +277,30 @@ public class TableService {
                 .capacity(table.getCapacity())
                 .location(table.getLocation())
                 .qrCode(table.getQrCode())
+                .build();
+    }
+
+    private BillResponse mapToBillResponse(Bill bill) {
+        if (bill == null) return null;
+
+        return BillResponse.builder()
+                .id(bill.getId())
+                .totalPrice(bill.getTotalPrice())
+                .partySize(bill.getPartySize())
+                .discountAmount(bill.getDiscountAmount())
+                .finalPrice(bill.getFinalPrice())
+                .status(bill.getStatus())
+                .reservationId(
+                        bill.getReservation() != null ?
+                                bill.getReservation().getId() : null
+                )
+                .paymentId(
+                        bill.getPayment() != null ?
+                                bill.getPayment().getId() : null
+                )
+                .tableNumbers(bill.getTableNumbers())
+                .createdAt(bill.getCreatedAt())
+                .closedAt(bill.getClosedAt())
                 .build();
     }
 }
