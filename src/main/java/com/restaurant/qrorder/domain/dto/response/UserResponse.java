@@ -17,12 +17,12 @@ import static lombok.AccessLevel.PRIVATE;
 @AllArgsConstructor
 @FieldDefaults(level = PRIVATE)
 public class UserResponse {
-
-    Long id;
-    String fullName;
-    String email;
-    String phone;
-    UserRole role;
-    Boolean active;
-    LocalDateTime createdAt;
+    private Long id;
+    private String fullName;
+    private String email;
+    private String phone;
+    private String role;
+    private Boolean active;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

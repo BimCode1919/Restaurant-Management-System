@@ -1,5 +1,6 @@
 package com.restaurant.qrorder.domain.entity;
 
+import com.restaurant.qrorder.domain.common.OrderStatus;
 import com.restaurant.qrorder.domain.common.OrderType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
