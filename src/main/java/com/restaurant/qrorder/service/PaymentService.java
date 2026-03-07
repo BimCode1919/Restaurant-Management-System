@@ -210,28 +210,31 @@ public class PaymentService {
     /**
      * Check payment status
      */
+    @Transactional
     public PaymentResponse checkPaymentStatus(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
         // If MoMo and pending, query MoMo for status
-        if (PaymentMethod.MOMO.equals(payment.getMethod()) && 
-            payment.getStatus() == PaymentStatus.PENDING) {
-            
-            MoMoPaymentService.MoMoPaymentStatus status = 
-                    moMoPaymentService.checkPaymentStatus(payment.getMomoRequestId());
+        if (PaymentMethod.MOMO.equals(payment.getMethod()) ) {
 
-            if (status.isCompleted()) {
+            MoMoPaymentService.MoMoPaymentStatus status =
+                    moMoPaymentService.checkPaymentStatus(payment.getMomoOrderId(), payment.getMomoRequestId());
+
+            PaymentStatus newStatus = status.toPaymentStatus();
+
+            payment.setStatus(newStatus);
+
+            if (newStatus == PaymentStatus.COMPLETED) {
                 handleMoMoCallback(
                         payment.getMomoOrderId(),
                         status.getTransId(),
                         "0",
                         "Payment completed"
                 );
-            } else if (status.isFailed()) {
-                payment.markAsFailed(status.getMessage());
-                paymentRepository.save(payment);
             }
+
+            paymentRepository.save(payment);
         }
 
         return mapToResponse(payment);
