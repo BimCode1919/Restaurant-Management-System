@@ -7,6 +7,8 @@ import com.restaurant.qrorder.domain.dto.request.CreatePaymentRequest;
 import com.restaurant.qrorder.domain.dto.response.PaymentResponse;
 import com.restaurant.qrorder.domain.entity.Bill;
 import com.restaurant.qrorder.domain.entity.Payment;
+import com.restaurant.qrorder.exception.custom.InvalidOperationException;
+import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,46 +35,47 @@ public class PaymentService {
     @Transactional
     public PaymentResponse createPayment(CreatePaymentRequest request) {
         Bill bill = billRepository.findById(request.getBillId())
-                .orElseThrow(() -> new RuntimeException("Bill not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Bill not found"));
 
-        // Validate bill status
         if (bill.getStatus() == BillStatus.PAID) {
-            throw new RuntimeException("Bill is already paid");
+            throw new InvalidOperationException("Bill is already paid");
         }
 
         if (bill.getStatus() == BillStatus.CANCELLED) {
-            throw new RuntimeException("Cannot pay a cancelled bill");
+            throw new InvalidOperationException("Cannot pay a cancelled bill");
+        }
+
+        // ✅ Get amount directly from bill — no need for user to pass it
+        BigDecimal amount = bill.getFinalPrice();
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidOperationException("Bill has no valid amount to pay");
         }
 
         // Check if payment already exists
         paymentRepository.findByBillId(bill.getId())
                 .ifPresent(existingPayment -> {
                     if (existingPayment.getStatus() == PaymentStatus.COMPLETED) {
-                        throw new RuntimeException("Bill already has a completed payment");
+                        throw new InvalidOperationException("Bill already has a completed payment");
                     }
-                    // Delete pending/failed payments to create new one
+                    // Delete pending/failed payments to allow retry
                     paymentRepository.delete(existingPayment);
                 });
-
-        // Validate amount
-        if (request.getAmount().compareTo(bill.getFinalPrice()) != 0) {
-            throw new RuntimeException("Payment amount must match bill final price");
-        }
 
         Payment payment;
 
         if (PaymentMethod.CASH.equals(request.getPaymentMethod())) {
-            payment = createCashPayment(bill, request.getAmount());
+            payment = createCashPayment(bill, amount); // ✅ pass amount from bill
         } else if (PaymentMethod.MOMO.equals(request.getPaymentMethod())) {
-            payment = createMoMoPayment(bill, request);
+            payment = createMoMoPayment(bill, amount); // ✅ pass amount from bill
         } else {
-            throw new RuntimeException("Payment method not supported yet");
+            throw new InvalidOperationException("Payment method not supported: " + request.getPaymentMethod());
         }
 
         Payment saved = paymentRepository.save(payment);
 
-        log.info("Created payment ID: {} for bill ID: {} with method: {}", 
-                saved.getId(), bill.getId(), request.getPaymentMethod());
+        log.info("Created payment ID: {} for bill ID: {} | amount: {} | method: {}",
+                saved.getId(), bill.getId(), amount, request.getPaymentMethod());
 
         return mapToResponse(saved);
     }
@@ -100,29 +103,37 @@ public class PaymentService {
     /**
      * Create MoMo payment (requires payment URL)
      */
-    private Payment createMoMoPayment(Bill bill, CreatePaymentRequest request) {
+    private Payment createMoMoPayment(Bill bill, BigDecimal amount) {
         String orderId = "BILL_" + bill.getId() + "_" + System.currentTimeMillis();
         String requestId = UUID.randomUUID().toString();
 
-        // Call MoMo service to get payment URL
+        // ✅ Pull customer info from bill's reservation (if exists)
+        String customerName = null;
+        String customerPhone = null;
+
+        if (bill.getReservation() != null) {
+            customerName = bill.getReservation().getCustomerName();
+            customerPhone = bill.getReservation().getCustomerPhone();
+        }
+
         MoMoPaymentService.MoMoPaymentResult momoResult = moMoPaymentService.createPayment(
                 orderId,
                 requestId,
-                request.getAmount(),
+                amount,                          // ✅ from bill.getFinalPrice()
                 "Payment for Bill #" + bill.getId(),
-                request.getReturnUrl(),
-                request.getCustomerName(),
-                request.getCustomerPhone()
+                null,                            // returnUrl handled in MoMo config/properties
+                customerName,                    // ✅ from reservation, nullable
+                customerPhone                    // ✅ from reservation, nullable
         );
 
         if (!momoResult.isSuccess()) {
-            throw new RuntimeException("Failed to create MoMo payment: " + momoResult.getMessage());
+            throw new InvalidOperationException("Failed to create MoMo payment: " + momoResult.getMessage());
         }
 
         return Payment.builder()
                 .bill(bill)
                 .method(PaymentMethod.MOMO)
-                .amount(request.getAmount())
+                .amount(amount)                  // ✅ from bill
                 .status(PaymentStatus.PENDING)
                 .momoOrderId(orderId)
                 .momoRequestId(requestId)

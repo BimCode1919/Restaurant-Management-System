@@ -312,22 +312,23 @@ INSERT INTO ingredients (id, name, unit, stock_quantity) VALUES
 
 -- Items (Menu Items)
 INSERT INTO items (id, category_id, name, description, price, unit, image_url, available, created_at, updated_at) VALUES
-(1, 1, 'Spring Rolls', 'Chả giò giòn rụm với rau sống', 45000, NULL, '/images/spring-rolls.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 1, 'Fried Wonton', 'Hoành thánh chiên giòn', 50000, NULL, '/images/fried-wonton.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, 1, 'Caesar Salad', 'Salad rau trộn sốt Caesar', 65000, NULL, '/images/caesar-salad.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 2, 'Fried Rice with Chicken', 'Cơm chiên gà', 75000, NULL, '/images/chicken-fried-rice.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(5, 2, 'Grilled Beef Steak', 'Bò bít tết nướng', 185000, NULL, '/images/beef-steak.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(6, 2, 'Shrimp Pasta', 'Mì Ý tôm sốt kem', 95000, NULL, '/images/shrimp-pasta.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(7, 2, 'Grilled Chicken', 'Gà nướng mật ong', 120000, NULL, '/images/grilled-chicken.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(8, 3, 'Vietnamese Coffee', 'Cà phê sữa đá', 35000, NULL, '/images/vietnamese-coffee.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(9, 3, 'Fresh Orange Juice', 'Nước cam vắt', 30000, NULL, '/images/orange-juice.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(10, 3, 'Soft Drink', 'Nước ngọt các loại', 20000, NULL, '/images/soft-drink.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(11, 3, 'Iced Tea', 'Trà đá chanh', 25000, NULL, '/images/iced-tea.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(12, 4, 'Tiramisu', 'Bánh Tiramisu Ý', 55000, NULL, '/images/tiramisu.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(13, 4, 'Ice Cream', 'Kem tươi các vị', 35000, NULL, '/images/ice-cream.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(14, 4, 'Flan Caramel', 'Bánh flan caramen', 30000, NULL, '/images/flan.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(15, 5, 'Tom Yum Soup', 'Súp Tom Yum chua cay', 70000, NULL, '/images/tom-yum.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(16, 5, 'Chicken Noodle Soup', 'Phở gà', 60000, NULL, '/images/pho-ga.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+(1, 1, 'Spring Rolls', 'Crispy Vietnamese spring rolls served with fresh vegetables', 45000, NULL, '/images/spring-rolls.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 1, 'Fried Wonton', 'Deep fried wontons', 50000, NULL, '/images/fried-wonton.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 1, 'Caesar Salad', 'Fresh salad with Caesar dressing', 65000, NULL, '/images/caesar-salad.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 2, 'Chicken Fried Rice', 'Fried rice with chicken', 75000, NULL, '/images/chicken-fried-rice.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 2, 'Grilled Beef Steak', 'Grilled beef steak', 185000, NULL, '/images/beef-steak.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 2, 'Shrimp Pasta', 'Creamy shrimp pasta', 95000, NULL, '/images/shrimp-pasta.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 2, 'Grilled Chicken', 'Honey glazed grilled chicken', 120000, NULL, '/images/grilled-chicken.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 3, 'Vietnamese Coffee', 'Vietnamese iced coffee with condensed milk', 35000, NULL, '/images/vietnamese-coffee.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 3, 'Fresh Orange Juice', 'Freshly squeezed orange juice', 30000, NULL, '/images/orange-juice.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 3, 'Soft Drink', 'Assorted soft drinks', 20000, NULL, '/images/soft-drink.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(11, 3, 'Iced Lemon Tea', 'Iced lemon tea', 25000, NULL, '/images/iced-tea.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 4, 'Tiramisu', 'Italian tiramisu dessert', 55000, NULL, '/images/tiramisu.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(13, 4, 'Ice Cream', 'Ice cream with various flavors', 35000, NULL, '/images/ice-cream.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(14, 4, 'Caramel Flan', 'Caramel custard flan', 30000, NULL, '/images/flan.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(15, 5, 'Tom Yum Soup', 'Spicy and sour Tom Yum soup', 70000, NULL, '/images/tom-yum.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(16, 5, 'Chicken Noodle Soup', 'Vietnamese chicken noodle soup (Pho Ga)', 60000, NULL, '/images/pho-ga.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
 
 -- Recipes (Item-Ingredient relationships)
 INSERT INTO recipes (id, item_id, ingredient_id, quantity, unit) VALUES
@@ -368,19 +369,18 @@ INSERT INTO tables (id, table_number, qr_code, capacity, status, location, creat
 
 -- Discounts (discount_type must be: ITEM_SPECIFIC, HOLIDAY, PARTY_SIZE, BILL_TIER)
 INSERT INTO discounts (id, code, name, description, discount_type, value_type, value, min_order_amount, max_discount_amount, start_date, end_date, usage_limit, used_count, active, created_at, updated_at) VALUES
-(1, 'WELCOME10', 'Welcome Discount', 'Giảm 10% cho khách hàng mới', 'HOLIDAY', 'PERCENTAGE', 10, 100000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 'FREESHIP', 'Free Shipping', 'Miễn phí vận chuyển đơn từ 200k', 'BILL_TIER', 'FIXED_AMOUNT', 30000, 200000, 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 200, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, 'LUNCH20', 'Lunch Special', 'Giảm 20% giờ vàng (11h-13h)', 'HOLIDAY', 'PERCENTAGE', 20, 150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 'HAPPY50K', 'Happy Hour', 'Giảm 50k cho đơn từ 300k', 'BILL_TIER', 'FIXED_AMOUNT', 50000, 300000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days', 50, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(5, 'SALE20', 'Flash Sale 20%', 'Giảm 20% tối đa 50k cho đơn từ 100k', 'HOLIDAY', 'PERCENTAGE', 20, 100000, 50000, '2026-01-25 00:00:00', '2026-02-28 23:59:59', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(6, 'PIZZA20', 'Pizza Sale 20%', 'Giảm 20% cho tất cả món Pizza', 'ITEM_SPECIFIC', 'PERCENTAGE', 20, NULL, NULL, '2026-01-25 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(7, 'WEEKENDPARTY', 'Weekend Party 25%', 'Giảm 25% vào thứ 7, chủ nhật', 'HOLIDAY', 'PERCENTAGE', 25, 200000, 100000, '2026-02-01 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(8, 'TET2026', 'Tet Holiday Sale', 'Giảm 30% dịp Tết Nguyên Đán', 'HOLIDAY', 'PERCENTAGE', 30, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(9, 'GROUP4', 'Group Discount 4+ people', 'Giảm 10% cho nhóm 4-6 người', 'PARTY_SIZE', 'PERCENTAGE', 10, 200000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(10, 'GROUP7', 'Group Discount 7+ people', 'Giảm 15% cho nhóm 7-10 người', 'PARTY_SIZE', 'PERCENTAGE', 15, 7, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(11, 'BIGTIER', 'Spend More Save More', 'Giảm theo bậc: 5% (200k+), 10% (500k+), 15% (1M+)', 'BILL_TIER', 'PERCENTAGE', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(12, 'FIXEDTIER', 'Fixed Discount Tiers', 'Giảm cố định: 20k (200k+), 60k (500k+), 150k (1M+)', 'BILL_TIER', 'FIXED_AMOUNT', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
+(1, 'WELCOME10', 'Welcome Discount', '10% discount for new customers', 'HOLIDAY', 'PERCENTAGE', 10, 100000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'FREESHIP', 'Free Shipping', 'Free delivery for orders above 200k', 'BILL_TIER', 'FIXED_AMOUNT', 30000, 200000, 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 200, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 'LUNCH20', 'Lunch Special', '20% discount during lunch hours (11 AM - 1 PM)', 'HOLIDAY', 'PERCENTAGE', 20, 150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 'HAPPY50K', 'Happy Hour', '50k discount for orders above 300k', 'BILL_TIER', 'FIXED_AMOUNT', 50000, 300000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days', 50, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'SALE20', 'Flash Sale 20%', '20% discount up to 50k for orders above 100k', 'HOLIDAY', 'PERCENTAGE', 20, 100000, 50000, '2026-01-25 00:00:00', '2026-02-28 23:59:59', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 'PIZZA20', 'Pizza Sale 20%', '20% discount for all pizza items', 'ITEM_SPECIFIC', 'PERCENTAGE', 20, NULL, NULL, '2026-01-25 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 'WEEKENDPARTY', 'Weekend Party 25%', '25% discount on Saturdays and Sundays', 'HOLIDAY', 'PERCENTAGE', 25, 200000, 100000, '2026-02-01 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 'TET2026', 'Tet Holiday Sale', '30% discount during Lunar New Year holiday', 'HOLIDAY', 'PERCENTAGE', 30, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 'GROUP4', 'Group Discount 4+ People', '10% discount for groups of 4-6 people', 'PARTY_SIZE', 'PERCENTAGE', 10, 200000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'GROUP7', 'Group Discount 7+ People', '15% discount for groups of 7-10 people', 'PARTY_SIZE', 'PERCENTAGE', 15, 7, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(11, 'BIGTIER', 'Spend More Save More', 'Tiered discount: 5% (200k+), 10% (500k+), 15% (1M+)', 'BILL_TIER', 'PERCENTAGE', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 'FIXEDTIER', 'Fixed Discount Tiers', 'Fixed discount tiers: 20k (200k+), 60k (500k+), 150k (1M+)', 'BILL_TIER', 'FIXED_AMOUNT', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- Update specific discount configurations
 UPDATE discounts SET applicable_days = 'SATURDAY,SUNDAY' WHERE code = 'WEEKENDPARTY';
 UPDATE discounts SET applicable_days = '2026-01-01,2026-02-10,2026-02-11,2026-02-12' WHERE code = 'TET2026';

@@ -21,16 +21,6 @@ public class CreatePaymentRequest {
     @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod;
 
-    @NotNull(message = "Amount is required")
-    private BigDecimal amount;
 
-    // For online payments - return URL after payment
-    private String returnUrl;
 
-    // For online payments - cancel URL
-    private String cancelUrl;
-
-    // Customer info for MoMo
-    private String customerName;
-    private String customerPhone;
 }
