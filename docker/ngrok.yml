@@ -1,0 +1,30 @@
+# Ngrok Configuration for Restaurant QR Order Backend
+# This config file is used by ngrok Docker container
+
+version: "2"
+
+# Web interface runs on port 4040 (accessible at http://localhost:4040)
+web_addr: 0.0.0.0:4040
+
+# Tunnels configuration
+tunnels:
+  backend:
+    proto: http
+    # Use host.docker.internal to access host machine from Docker container
+    # Change to 'backend:8080' if backend is also running in Docker
+    addr: host.docker.internal:8080
+    # Optional: Add custom subdomain (requires paid plan)
+    # subdomain: restaurant-qr-order
+    inspect: true
+    # Optional: Add basic auth for tunnel
+    # auth: "username:password"
+
+# Region: Choose closest to your location for better performance
+# Options: us, eu, ap, au, sa, jp, in
+region: ap
+
+# Log level: info, debug
+log_level: info
+
+# Log format: json, logfmt, term
+log_format: term

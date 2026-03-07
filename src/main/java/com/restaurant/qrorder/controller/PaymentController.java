@@ -90,9 +90,10 @@ public class PaymentController {
     /**
      * MoMo IPN (Instant Payment Notification) callback
      * This endpoint is called by MoMo server after payment
+     * IMPORTANT: This URL must be publicly accessible (use ngrok for local development)
      */
-    @PostMapping("/momo/notify")
-    public ResponseEntity<Map<String, Object>> momoNotify(@RequestBody Map<String, String> params) {
+    @PostMapping("/momo/ipn")
+    public ResponseEntity<Map<String, Object>> momoIpn(@RequestBody Map<String, String> params) {
         log.info("Received MoMo IPN callback: {}", params);
 
         try {
@@ -100,11 +101,14 @@ public class PaymentController {
             String transId = params.get("transId");
             String resultCode = params.get("resultCode");
             String message = params.get("message");
-            // String signature = params.get("signature"); // TODO: Verify signature
+            String signature = params.get("signature");
 
-            // TODO: Verify signature for security
-            // if (!momoService.verifySignature(params, signature)) {
-            //     return error response
+            // TODO: Verify signature for security in production
+            // if (!paymentService.verifyMoMoSignature(params, signature)) {
+            //     log.error("Invalid MoMo signature for order: {}", orderId);
+            //     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+            //         Map.of("status", "error", "message", "Invalid signature")
+            //     );
             // }
 
             paymentService.handleMoMoCallback(orderId, transId, resultCode, message);
@@ -116,7 +120,7 @@ public class PaymentController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            log.error("Error processing MoMo callback", e);
+            log.error("Error processing MoMo IPN callback", e);
             
             Map<String, Object> response = new HashMap<>();
             response.put("status", "error");
@@ -127,27 +131,46 @@ public class PaymentController {
     }
 
     /**
+     * MoMo notify endpoint (alias for IPN - backward compatibility)
+     */
+    @PostMapping("/momo/notify")
+    public ResponseEntity<Map<String, Object>> momoNotify(@RequestBody Map<String, String> params) {
+        return momoIpn(params);
+    }
+
+    /**
      * MoMo return URL - where customer is redirected after payment
+     * This endpoint can return HTML to redirect to frontend, or JSON for API response
      */
     @GetMapping("/momo/return")
-    public ResponseEntity<Map<String, Object>> momoReturn(
+    public ResponseEntity<?> momoReturn(
             @RequestParam String orderId,
             @RequestParam String resultCode,
-            @RequestParam(required = false) String message) {
+            @RequestParam(required = false) String message,
+            @RequestParam(required = false) String requestId,
+            @RequestParam(required = false) String extraData) {
         
-        log.info("MoMo return - Order: {}, ResultCode: {}", orderId, resultCode);
+        log.info("MoMo return - Order: {}, ResultCode: {}, Message: {}", orderId, resultCode, message);
 
+        boolean isSuccess = "0".equals(resultCode);
+        String status = isSuccess ? "success" : "failed";
+        String displayMessage = isSuccess ? "Payment successful!" : (message != null ? message : "Payment failed");
+
+        // Option 1: Return JSON response (for API testing)
         Map<String, Object> response = new HashMap<>();
-        
-        if ("0".equals(resultCode)) {
-            response.put("status", "success");
-            response.put("message", "Payment successful");
-        } else {
-            response.put("status", "failed");
-            response.put("message", message != null ? message : "Payment failed");
-        }
-        
+        response.put("status", status);
+        response.put("message", displayMessage);
         response.put("orderId", orderId);
+        response.put("resultCode", resultCode);
+        
+        // TODO: For production, redirect to frontend with payment status
+        // String frontendUrl = String.format(
+        //     "http://localhost:3000/payment/%s?orderId=%s&status=%s",
+        //     status, orderId, resultCode
+        // );
+        // return ResponseEntity.status(HttpStatus.FOUND)
+        //     .header("Location", frontendUrl)
+        //     .build();
         
         return ResponseEntity.ok(response);
     }

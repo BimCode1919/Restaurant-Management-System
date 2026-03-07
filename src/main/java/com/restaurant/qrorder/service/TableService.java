@@ -3,12 +3,15 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateTableRequest;
 import com.restaurant.qrorder.domain.dto.request.UpdateTableRequest;
+import com.restaurant.qrorder.domain.dto.response.BillResponse;
+import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
+import com.restaurant.qrorder.domain.dto.response.OrderResponse;
 import com.restaurant.qrorder.domain.dto.response.TableResponse;
-import com.restaurant.qrorder.domain.entity.Reservation;
-import com.restaurant.qrorder.domain.entity.RestaurantTable;
+import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
+import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.ReservationRepository;
 import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -35,6 +39,7 @@ public class TableService {
 
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+    private final BillRepository billRepository;
 
     /**
      * Get all tables
@@ -248,9 +253,14 @@ public class TableService {
      * Map entity to response DTO
      */
     private TableResponse mapToResponse(RestaurantTable table) {
+        Bill currentBill = billRepository
+                .findCurrentBillByTableId(table.getId())
+                .orElse(null);
+
         return TableResponse.builder()
                 .id(table.getId())
                 .tableNumber(table.getTableNumber())
+                .currentBill(mapToBillResponse(currentBill))
                 .capacity(table.getCapacity())
                 .status(table.getStatus())
                 .location(table.getLocation())
@@ -268,6 +278,66 @@ public class TableService {
                 .capacity(table.getCapacity())
                 .location(table.getLocation())
                 .qrCode(table.getQrCode())
+                .build();
+    }
+
+    private BillResponse mapToBillResponse(Bill bill) {
+        if (bill == null) return null;
+
+        return BillResponse.builder()
+                .id(bill.getId())
+                .totalPrice(bill.getTotalPrice())
+                .partySize(bill.getPartySize())
+                .discountAmount(bill.getDiscountAmount())
+                .finalPrice(bill.getFinalPrice())
+                .status(bill.getStatus())
+                .reservationId(
+                        bill.getReservation() != null ?
+                                bill.getReservation().getId() : null
+                )
+                .paymentId(
+                        bill.getPayment() != null ?
+                                bill.getPayment().getId() : null
+                )
+                .tableNumbers(bill.getTableNumbers())
+                .orders(bill.getOrders().stream()
+                        .map(this::mapOrderToResponse)
+                        .collect(Collectors.toList()))
+                .createdAt(bill.getCreatedAt())
+                .closedAt(bill.getClosedAt())
+                .build();
+    }
+
+    private OrderResponse mapOrderToResponse(Order order) {
+        BigDecimal totalAmount = order.getOrderDetails().stream()
+                .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return OrderResponse.builder()
+                .id(order.getId())
+                .billId(order.getBill().getId())
+                .orderType(order.getOrderType())
+                .createdBy(order.getCreatedBy().getFullName())
+                .totalAmount(totalAmount)
+                .items(order.getOrderDetails().stream()
+                        .map(this::mapOrderDetailToResponse)
+                        .collect(Collectors.toList()))
+                .createdAt(order.getCreatedAt())
+                .build();
+    }
+
+    private OrderDetailResponse mapOrderDetailToResponse(OrderDetail detail) {
+        BigDecimal subtotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));
+
+        return OrderDetailResponse.builder()
+                .id(detail.getId())
+                .itemId(detail.getItem().getId())
+                .itemName(detail.getItem().getName())
+                .quantity(detail.getQuantity())
+                .price(detail.getPrice())
+                .subtotal(subtotal)
+                .itemStatus(detail.getItemStatus())
+                .notes(detail.getNote())
                 .build();
     }
 }

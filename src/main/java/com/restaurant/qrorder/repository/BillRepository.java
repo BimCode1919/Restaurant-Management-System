@@ -23,8 +23,13 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     Page<Bill> findByStatus(BillStatus status, Pageable pageable);
 
-    @Query("SELECT b FROM Bill b JOIN b.billTables bt WHERE b.status = 'OPEN' AND bt.table.id = :tableId")
-    Optional<Bill> findOpenBillByTableId(@Param("tableId") Long tableId);
+    @Query("""
+        SELECT b FROM Bill b
+        JOIN b.billTables bt
+        WHERE bt.table.id = :tableId
+        AND b.status = 'OPEN'
+    """)
+    Optional<Bill> findCurrentBillByTableId(Long tableId);
 
     @Query("SELECT b FROM Bill b WHERE b.createdAt BETWEEN :startDate AND :endDate")
     List<Bill> findByDateRange(

@@ -16,6 +16,7 @@ public class TableResponse {
     
     private Long id;
     private String tableNumber;
+    private BillResponse currentBill;
     private Integer capacity;
     private TableStatus status;
     private String location;

@@ -7,8 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,6 +19,7 @@ public class CreatePaymentRequest {
     @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod;
 
-
-
+    // Optional: For online payments - return URL after payment
+    // If not provided, will use default URL
+    private String returnUrl;
 }

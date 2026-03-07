@@ -7,8 +7,6 @@ import com.restaurant.qrorder.domain.dto.request.CreatePaymentRequest;
 import com.restaurant.qrorder.domain.dto.response.PaymentResponse;
 import com.restaurant.qrorder.domain.entity.Bill;
 import com.restaurant.qrorder.domain.entity.Payment;
-import com.restaurant.qrorder.exception.custom.InvalidOperationException;
-import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,47 +33,44 @@ public class PaymentService {
     @Transactional
     public PaymentResponse createPayment(CreatePaymentRequest request) {
         Bill bill = billRepository.findById(request.getBillId())
-                .orElseThrow(() -> new ResourceNotFoundException("Bill not found"));
+                .orElseThrow(() -> new RuntimeException("Bill not found"));
 
+        // Validate bill status
         if (bill.getStatus() == BillStatus.PAID) {
-            throw new InvalidOperationException("Bill is already paid");
+            throw new RuntimeException("Bill is already paid");
         }
 
         if (bill.getStatus() == BillStatus.CANCELLED) {
-            throw new InvalidOperationException("Cannot pay a cancelled bill");
-        }
-
-        // ✅ Get amount directly from bill — no need for user to pass it
-        BigDecimal amount = bill.getFinalPrice();
-
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidOperationException("Bill has no valid amount to pay");
+            throw new RuntimeException("Cannot pay a cancelled bill");
         }
 
         // Check if payment already exists
         paymentRepository.findByBillId(bill.getId())
                 .ifPresent(existingPayment -> {
                     if (existingPayment.getStatus() == PaymentStatus.COMPLETED) {
-                        throw new InvalidOperationException("Bill already has a completed payment");
+                        throw new RuntimeException("Bill already has a completed payment");
                     }
-                    // Delete pending/failed payments to allow retry
+                    // Delete pending/failed payments to create new one
                     paymentRepository.delete(existingPayment);
                 });
+
+        // Get amount from bill
+        BigDecimal amount = bill.getFinalPrice();
 
         Payment payment;
 
         if (PaymentMethod.CASH.equals(request.getPaymentMethod())) {
-            payment = createCashPayment(bill, amount); // ✅ pass amount from bill
+            payment = createCashPayment(bill, amount);
         } else if (PaymentMethod.MOMO.equals(request.getPaymentMethod())) {
-            payment = createMoMoPayment(bill, amount); // ✅ pass amount from bill
+            payment = createMoMoPayment(bill, request);
         } else {
-            throw new InvalidOperationException("Payment method not supported: " + request.getPaymentMethod());
+            throw new RuntimeException("Payment method not supported yet");
         }
 
         Payment saved = paymentRepository.save(payment);
 
-        log.info("Created payment ID: {} for bill ID: {} | amount: {} | method: {}",
-                saved.getId(), bill.getId(), amount, request.getPaymentMethod());
+        log.info("Created payment ID: {} for bill ID: {} with method: {}", 
+                saved.getId(), bill.getId(), request.getPaymentMethod());
 
         return mapToResponse(saved);
     }
@@ -103,37 +98,28 @@ public class PaymentService {
     /**
      * Create MoMo payment (requires payment URL)
      */
-    private Payment createMoMoPayment(Bill bill, BigDecimal amount) {
+    private Payment createMoMoPayment(Bill bill, CreatePaymentRequest request) {
         String orderId = "BILL_" + bill.getId() + "_" + System.currentTimeMillis();
         String requestId = UUID.randomUUID().toString();
+        BigDecimal amount = bill.getFinalPrice();
 
-        // ✅ Pull customer info from bill's reservation (if exists)
-        String customerName = null;
-        String customerPhone = null;
-
-        if (bill.getReservation() != null) {
-            customerName = bill.getReservation().getCustomerName();
-            customerPhone = bill.getReservation().getCustomerPhone();
-        }
-
+        // Call MoMo service to get payment URL
         MoMoPaymentService.MoMoPaymentResult momoResult = moMoPaymentService.createPayment(
                 orderId,
                 requestId,
-                amount,                          // ✅ from bill.getFinalPrice()
+                amount,
                 "Payment for Bill #" + bill.getId(),
-                null,                            // returnUrl handled in MoMo config/properties
-                customerName,                    // ✅ from reservation, nullable
-                customerPhone                    // ✅ from reservation, nullable
+                request.getReturnUrl()
         );
 
         if (!momoResult.isSuccess()) {
-            throw new InvalidOperationException("Failed to create MoMo payment: " + momoResult.getMessage());
+            throw new RuntimeException("Failed to create MoMo payment: " + momoResult.getMessage());
         }
 
         return Payment.builder()
                 .bill(bill)
                 .method(PaymentMethod.MOMO)
-                .amount(amount)                  // ✅ from bill
+                .amount(amount)
                 .status(PaymentStatus.PENDING)
                 .momoOrderId(orderId)
                 .momoRequestId(requestId)
@@ -249,6 +235,16 @@ public class PaymentService {
         }
 
         return mapToResponse(payment);
+    }
+
+    /**
+     * Verify MoMo signature for IPN callback
+     * @param params MoMo callback parameters
+     * @param signature Signature from MoMo
+     * @return true if signature is valid
+     */
+    public boolean verifyMoMoSignature(java.util.Map<String, String> params, String signature) {
+        return moMoPaymentService.verifySignature(params, signature);
     }
 
     private PaymentResponse mapToResponse(Payment payment) {
