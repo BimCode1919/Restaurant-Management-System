@@ -49,9 +49,7 @@ public class MoMoPaymentService {
             String requestId,
             BigDecimal amount,
             String orderInfo,
-            String returnUrl,
-            String customerName,
-            String customerPhone) {
+            String returnUrl) {
 
         try {
             String requestType = "captureWallet";
@@ -94,11 +92,22 @@ public class MoMoPaymentService {
             // In production, use HTTP client to call MoMo API
             // For now, return mock response
             log.info("Creating MoMo payment - Order: {}, Amount: {}", orderId, amount);
+            log.debug("MoMo request body: {}", requestBody);
 
-            // Mock payment URL
+            // Mock payment URL with proper format (MoMo returns deeplink format)
+            // In production, this would be the 'payUrl' or 'deeplink' from MoMo response
             String payUrl = String.format(
-                    "https://test-payment.momo.vn/v2/gateway/pay?orderId=%s&amount=%d",
-                    orderId, amount.longValue()
+                    "https://test-payment.momo.vn/v2/gateway/pay?partnerCode=%s&accessKey=%s&requestId=%s&orderId=%s&orderInfo=%s&returnUrl=%s&notifyUrl=%s&amount=%d&requestType=%s&signature=%s",
+                    partnerCode,
+                    accessKey,
+                    requestId,
+                    orderId,
+                    orderInfo,
+                    redirectUrl,
+                    notifyUrl,
+                    amount.longValue(),
+                    requestType,
+                    signature
             );
 
             return MoMoPaymentResult.builder()

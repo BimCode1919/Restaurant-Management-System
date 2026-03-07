@@ -54,15 +54,13 @@ public class PaymentService {
                     paymentRepository.delete(existingPayment);
                 });
 
-        // Validate amount
-        if (request.getAmount().compareTo(bill.getFinalPrice()) != 0) {
-            throw new RuntimeException("Payment amount must match bill final price");
-        }
+        // Get amount from bill
+        BigDecimal amount = bill.getFinalPrice();
 
         Payment payment;
 
         if (PaymentMethod.CASH.equals(request.getPaymentMethod())) {
-            payment = createCashPayment(bill, request.getAmount());
+            payment = createCashPayment(bill, amount);
         } else if (PaymentMethod.MOMO.equals(request.getPaymentMethod())) {
             payment = createMoMoPayment(bill, request);
         } else {
@@ -103,16 +101,15 @@ public class PaymentService {
     private Payment createMoMoPayment(Bill bill, CreatePaymentRequest request) {
         String orderId = "BILL_" + bill.getId() + "_" + System.currentTimeMillis();
         String requestId = UUID.randomUUID().toString();
+        BigDecimal amount = bill.getFinalPrice();
 
         // Call MoMo service to get payment URL
         MoMoPaymentService.MoMoPaymentResult momoResult = moMoPaymentService.createPayment(
                 orderId,
                 requestId,
-                request.getAmount(),
+                amount,
                 "Payment for Bill #" + bill.getId(),
-                request.getReturnUrl(),
-                request.getCustomerName(),
-                request.getCustomerPhone()
+                request.getReturnUrl()
         );
 
         if (!momoResult.isSuccess()) {
@@ -122,7 +119,7 @@ public class PaymentService {
         return Payment.builder()
                 .bill(bill)
                 .method(PaymentMethod.MOMO)
-                .amount(request.getAmount())
+                .amount(amount)
                 .status(PaymentStatus.PENDING)
                 .momoOrderId(orderId)
                 .momoRequestId(requestId)
@@ -238,6 +235,16 @@ public class PaymentService {
         }
 
         return mapToResponse(payment);
+    }
+
+    /**
+     * Verify MoMo signature for IPN callback
+     * @param params MoMo callback parameters
+     * @param signature Signature from MoMo
+     * @return true if signature is valid
+     */
+    public boolean verifyMoMoSignature(java.util.Map<String, String> params, String signature) {
+        return moMoPaymentService.verifySignature(params, signature);
     }
 
     private PaymentResponse mapToResponse(Payment payment) {

@@ -40,6 +40,27 @@ services:
       timeout: 5s
       retries: 5
 
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: restaurant_ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "start"
+      - "--all"
+      - "--config"
+      - "/etc/ngrok.yml"
+    ports:
+      - "4040:4040"  # Ngrok web UI
+    volumes:
+      - ./docker/ngrok.yml:/etc/ngrok.yml:ro
+    networks:
+      - restaurant_network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
 volumes:
   postgres_data:
     driver: local

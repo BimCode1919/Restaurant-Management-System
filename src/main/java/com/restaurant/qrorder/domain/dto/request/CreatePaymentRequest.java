@@ -7,8 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,16 +19,7 @@ public class CreatePaymentRequest {
     @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod;
 
-    @NotNull(message = "Amount is required")
-    private BigDecimal amount;
-
-    // For online payments - return URL after payment
+    // Optional: For online payments - return URL after payment
+    // If not provided, will use default URL
     private String returnUrl;
-
-    // For online payments - cancel URL
-    private String cancelUrl;
-
-    // Customer info for MoMo
-    private String customerName;
-    private String customerPhone;
 }

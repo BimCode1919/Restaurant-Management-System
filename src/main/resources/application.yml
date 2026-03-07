@@ -67,9 +67,9 @@ momo:
   partner-code: ${MOMO_PARTNER_CODE:MOMO_PARTNER_CODE}
   access-key: ${MOMO_ACCESS_KEY:MOMO_ACCESS_KEY}
   secret-key: ${MOMO_SECRET_KEY:MOMO_SECRET_KEY}
-  endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api/create}
+  endpoint: ${MOMO_API_URL:https://test-payment.momo.vn/v2/gateway/api/create}
   return-url: ${MOMO_RETURN_URL:http://localhost:8080/api/payments/momo/return}
-  notify-url: ${MOMO_NOTIFY_URL:http://localhost:8080/api/payments/momo/notify}
+  notify-url: ${MOMO_NOTIFY_URL:http://localhost:8080/api/payments/momo/ipn}
 
 logging:
   level:
