@@ -113,7 +113,7 @@ public class ReservationService {
 
 
 
-//        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
+        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
         Reservation savedReservation = reservationRepository.save(reservation);
 
         Bill bill = Bill.builder()

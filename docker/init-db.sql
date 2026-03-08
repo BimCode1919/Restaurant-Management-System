@@ -381,6 +381,31 @@ INSERT INTO discounts (id, code, name, description, discount_type, value_type, v
 (10, 'GROUP7', 'Group Discount 7+ People', '15% discount for groups of 7-10 people', 'PARTY_SIZE', 'PERCENTAGE', 15, 7, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (11, 'BIGTIER', 'Spend More Save More', 'Tiered discount: 5% (200k+), 10% (500k+), 15% (1M+)', 'BILL_TIER', 'PERCENTAGE', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (12, 'FIXEDTIER', 'Fixed Discount Tiers', 'Fixed discount tiers: 20k (200k+), 60k (500k+), 150k (1M+)', 'BILL_TIER', 'FIXED_AMOUNT', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+UPDATE discounts
+SET tier_config     = '200000:5,500000:10,1000000:15',
+    min_order_amount = 200000,   -- must spend at least 200k to qualify
+    max_discount_amount = 200000 -- cap discount at 200k
+WHERE code = 'BIGTIER';
+
+-- Fix FIXEDTIER: FIXED_AMOUNT tiers need different handling
+-- Since your calculateTierDiscount uses percentage math, convert to percentage-equivalent
+-- OR simplify to percentage type so it works with existing code
+UPDATE discounts
+SET tier_config      = '200000:5,500000:10,1000000:15',
+    value_type       = 'PERCENTAGE',   -- change to PERCENTAGE so calculateTierDiscount works
+    min_order_amount  = 200000,
+    max_discount_amount = 150000
+WHERE code = 'FIXEDTIER';
+
+-- Fix GROUP10: min_order_amount and max_discount_amount had party size values (7,10) in wrong columns
+UPDATE discounts
+SET min_order_amount  = 200000,  -- minimum spend
+    max_discount_amount = NULL,
+    min_party_size    = 7,
+    max_party_size    = 10
+WHERE code = 'GROUP7';
+
 -- Update specific discount configurations
 UPDATE discounts SET applicable_days = 'SATURDAY,SUNDAY' WHERE code = 'WEEKENDPARTY';
 UPDATE discounts SET applicable_days = '2026-01-01,2026-02-10,2026-02-11,2026-02-12' WHERE code = 'TET2026';
