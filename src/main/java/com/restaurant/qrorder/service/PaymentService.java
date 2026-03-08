@@ -3,12 +3,16 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.common.PaymentMethod;
 import com.restaurant.qrorder.domain.common.PaymentStatus;
+import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreatePaymentRequest;
 import com.restaurant.qrorder.domain.dto.response.PaymentResponse;
 import com.restaurant.qrorder.domain.entity.Bill;
+import com.restaurant.qrorder.domain.entity.BillTable;
 import com.restaurant.qrorder.domain.entity.Payment;
+import com.restaurant.qrorder.domain.entity.RestaurantTable;
 import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.PaymentRepository;
+import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -26,6 +31,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BillRepository billRepository;
     private final MoMoPaymentService moMoPaymentService;
+    private final RestaurantTableRepository tableRepository;
 
     /**
      * Create payment for a bill
@@ -89,6 +95,13 @@ public class PaymentService {
 
         // Update bill status
         bill.setStatus(BillStatus.PAID);
+        List<BillTable> billTableList = bill.getBillTables();
+        for (BillTable billTable : bill.getBillTables()) {
+            RestaurantTable table = billTable.getTable();
+            table.setStatus(TableStatus.AVAILABLE);
+            log.info("Updated table with id:",table.getId() );
+            tableRepository.save(table);
+        }
         bill.setClosedAt(LocalDateTime.now());
         billRepository.save(bill);
 
@@ -145,6 +158,12 @@ public class PaymentService {
             // Update bill
             Bill bill = payment.getBill();
             bill.setStatus(BillStatus.PAID);
+            for (BillTable billTable : bill.getBillTables()) {
+                RestaurantTable table = billTable.getTable();
+                table.setStatus(TableStatus.AVAILABLE);
+                log.info("Updated table with id:",table.getId() );
+                tableRepository.save(table);
+            }
             bill.setClosedAt(LocalDateTime.now());
             billRepository.save(bill);
 
