@@ -281,11 +281,11 @@ INSERT INTO users (id, email, password, full_name, phone, role_id, active, creat
 
 -- Categories
 INSERT INTO categories (id, name, description) VALUES
-(1, 'Appetizers', 'Món khai vị'),
-(2, 'Main Course', 'Món chính'),
-(3, 'Beverages', 'Đồ uống'),
-(4, 'Desserts', 'Món tráng miệng'),
-(5, 'Soup', 'Canh/Súp');
+(1, 'Appetizers', 'Starter dishes'),
+(2, 'Main Course', 'Main dishes'),
+(3, 'Beverages', 'Drinks'),
+(4, 'Desserts', 'Sweet dishes served after the main meal'),
+(5, 'Soup', 'Soup dishes');
 
 -- Ingredients
 INSERT INTO ingredients (id, name, unit, stock_quantity) VALUES
