@@ -261,7 +261,8 @@ public class BillService {
                 .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        bill.setTotalPrice(totalPrice);
+        BigDecimal oldTotalPrice = bill.getTotalPrice();
+        bill.setTotalPrice((oldTotalPrice.add(totalPrice)));
 
         // Recalculate discount if exists
         if (bill.getDiscount() != null) {

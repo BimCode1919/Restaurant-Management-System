@@ -4,10 +4,10 @@ import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.common.ReservationStatus;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
+import com.restaurant.qrorder.domain.dto.request.CreateReservationRequestWithoutDeposit;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
-import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +58,7 @@ public class ReservationService {
                 .reservationTime(request.getReservationTime())
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
-                .depositRequired(request.getDepositRequired() != null ? request.getDepositRequired() : false)
+                .depositRequired(false)
                 .depositAmount(request.getDepositAmount())
                 .depositPaid(false)
                 .createdBy(user)
@@ -88,7 +88,19 @@ public class ReservationService {
                 request.getReservationTime()
         );
 
+        boolean isLargeGroup  = request.getPartySize() != null && request.getPartySize() > 10;
+        boolean hasPreOrder   = request.getPreOrderItems() != null && !request.getPreOrderItems().isEmpty();
 
+        if (!isLargeGroup && !hasPreOrder) {
+            throw new InvalidOperationException(
+                    "Deposit reservation requires either party size > 10 or pre-order items. " +
+                            "For small groups without pre-order, use standard reservation instead."
+            );
+        }
+
+        if (request.getDepositAmount() == null || request.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidOperationException("Deposit amount is required and must be greater than 0");
+        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -104,7 +116,7 @@ public class ReservationService {
                 .reservationTime(request.getReservationTime())
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
-                .depositRequired(request.getDepositRequired() != null ? request.getDepositRequired() : false)
+                .depositRequired(true)
                 .depositAmount(request.getDepositAmount())
                 .depositPaid(false)
                 .createdBy(user)
@@ -117,7 +129,7 @@ public class ReservationService {
         Reservation savedReservation = reservationRepository.save(reservation);
 
         Bill bill = Bill.builder()
-                .totalPrice(savedReservation.getDepositAmount())
+                .totalPrice(request.getDepositAmount())
                 .partySize(request.getPartySize())
                 .discountAmount(BigDecimal.ZERO)
                 .finalPrice(BigDecimal.ZERO)
@@ -140,12 +152,91 @@ public class ReservationService {
                     .bill(savedBill)
                     .table(table)
                     .build();
+            table.setStatus(TableStatus.RESERVED);
             savedBill.getBillTables().add(billTable);
         }
         tableRepository.saveAll(tables);
         billRepository.save(savedBill);
 
-        log.info("Created reservation ID: {} for customer: {}", savedReservation.getId(), savedReservation.getCustomerName());
+        log.info("Created reservation WITH deposit [ID: {}] for customer: {}, partySize: {}, deposit: {}",
+                savedReservation.getId(), savedReservation.getCustomerName(),
+                request.getPartySize(), request.getDepositAmount());
+
+        return mapToResponse(savedReservation);
+    }
+
+    @Transactional
+    public ReservationResponse createReservationWithoutDeposit(CreateReservationRequestWithoutDeposit request, Long userId) {
+        validateReservationTime(request.getReservationTime());
+
+        // ── Validate: party size must be <= 10 ────────────────────────────────
+        if (request.getPartySize() != null && request.getPartySize() > 10) {
+            throw new InvalidOperationException(
+                    "Large groups (> 10 people) must use deposit reservation. " +
+                            "Please use the deposit reservation endpoint instead."
+            );
+        }
+
+        List<RestaurantTable> tables = findAndValidateTables(
+                request.getRequestedTableIds(),
+                request.getPartySize(),
+                request.getReservationTime()
+        );
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        // ── Create Reservation only, no Bill needed yet ────────────────────────
+        Reservation reservation = Reservation.builder()
+                .customerName(request.getCustomerName())
+                .customerPhone(request.getCustomerPhone())
+                .customerEmail(request.getCustomerEmail())
+                .partySize(request.getPartySize())
+                .reservationTime(request.getReservationTime())
+                .status(ReservationStatus.PENDING)
+                .note(request.getNote())
+                .depositRequired(false)   // no deposit needed
+                .depositAmount(null)
+                .depositPaid(false)
+                .createdBy(user)
+                .tables(tables)
+                .build();
+
+        Reservation savedReservation = reservationRepository.save(reservation);
+
+        Bill bill = Bill.builder()
+                .totalPrice(BigDecimal.ZERO)
+                .partySize(request.getPartySize())
+                .discountAmount(BigDecimal.ZERO)
+                .finalPrice(BigDecimal.ZERO)
+                .status(BillStatus.OPEN)
+                .billTables(new ArrayList<>())
+                .orders(new ArrayList<>())
+                .reservation(savedReservation)
+                .build();
+
+
+        Bill savedBill = billRepository.save(bill);
+        savedReservation.setBill(savedBill);
+        savedReservation = reservationRepository.save(reservation);
+
+
+        // Create bill-table associations and update table status
+        for (RestaurantTable table : tables) {
+            BillTable billTable = BillTable.builder()
+                    .id(new BillTable.BillTableId(savedBill.getId(), table.getId()))
+                    .bill(savedBill)
+                    .table(table)
+                    .build();
+            table.setStatus(TableStatus.RESERVED);
+            savedBill.getBillTables().add(billTable);
+        }
+        tableRepository.saveAll(tables);
+        billRepository.save(savedBill);
+
+
+        log.info("Created reservation WITHOUT deposit [ID: {}] for customer: {}, partySize: {}",
+                savedReservation.getId(), savedReservation.getCustomerName(), request.getPartySize());
 
         return mapToResponse(savedReservation);
     }
@@ -311,6 +402,13 @@ public class ReservationService {
             throw new RuntimeException("Reservation must be at least 1 hour in advance");
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime maxReservationDate = now.plusDays(3);
+
+        if (reservationTime.isAfter(maxReservationDate)) {
+            throw new IllegalArgumentException("Reservation can only be made within the next 3 days.");
+        }
+
         // Business hours validation (e.g., 9 AM - 10 PM)
         int hour = reservationTime.getHour();
         if (hour < 9 || hour >= 22) {
@@ -376,7 +474,7 @@ public class ReservationService {
                 .tableNumbers(reservation.getTables().stream()
                         .map(RestaurantTable::getTableNumber)
                         .collect(Collectors.toList()))
-                .billId(reservation.getBill() != null ? reservation.getBill().getId() : null)
+                .billId(reservation.getBill().getId())
                 .createdAt(reservation.getCreatedAt())
                 .updatedAt(reservation.getUpdatedAt())
                 .canCheckIn(reservation.getStatus() == ReservationStatus.CONFIRMED)

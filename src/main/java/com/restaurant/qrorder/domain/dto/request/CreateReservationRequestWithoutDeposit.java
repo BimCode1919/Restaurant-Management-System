@@ -12,10 +12,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateReservationRequest {
+@Builder
+public class CreateReservationRequestWithoutDeposit {
 
     @NotBlank(message = "Customer name is required")
     private String customerName;
@@ -45,22 +45,4 @@ public class CreateReservationRequest {
     @NotEmpty(message = "Table need to not be fill ín !!!!")
     @Valid
     private List<Long> requestedTableIds;
-
-    // Pre-order items (optional)
-    private List<PreOrderItemRequest> preOrderItems;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class PreOrderItemRequest {
-        @NotNull(message = "Item ID is required")
-        private Long itemId;
-
-        @NotNull(message = "Quantity is required")
-        @Min(value = 1, message = "Quantity must be at least 1")
-        private Integer quantity;
-
-        private String note;
-    }
 }

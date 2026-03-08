@@ -2,6 +2,7 @@ package com.restaurant.qrorder.controller;
 
 import com.restaurant.qrorder.domain.common.ReservationStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
+import com.restaurant.qrorder.domain.dto.request.CreateReservationRequestWithoutDeposit;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -30,11 +33,25 @@ public class ReservationController {
 
     private final ReservationService reservationService;
 
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Create reservation without deposit", description = "Create a new restaurant reservation (Authenticated users)")
+    public ResponseEntity<ReservationResponse> createReservationWithoutDeposit(
+            @RequestBody @Valid CreateReservationRequestWithoutDeposit request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+
+        ReservationResponse response = reservationService.createReservationWithoutDeposit(request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     /**
      * Create new reservation
      */
-    @PostMapping
-    @Operation(summary = "Create reservation", description = "Create a new restaurant reservation (Authenticated users)")
+    @PostMapping("/deposit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Create reservation with deposit", description = "Create a new restaurant reservation (Authenticated users)")
     public ResponseEntity<ReservationResponse> createReservation(
             @Valid @RequestBody CreateReservationRequest request,
             Authentication authentication) {
@@ -42,7 +59,7 @@ public class ReservationController {
         // Get user ID from authentication
         Long userId = getUserIdFromAuth(authentication);
         
-        ReservationResponse response = reservationService.createReservation(request, userId);
+        ReservationResponse response = reservationService.createReservationAndBill(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
