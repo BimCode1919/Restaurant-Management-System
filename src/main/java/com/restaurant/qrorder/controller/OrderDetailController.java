@@ -41,31 +41,4 @@ public class OrderDetailController {
                         .data(responses)
                         .build());
     }
-
-    @GetMapping("/sortByOldest")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
-    @Operation(summary = "Get a list of order detail sorted by oldest first")
-    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getOldestOrderFirst()
-    {
-        List<OrderDetailResponse> responses = orderDetailService.getAllOrderDetails();
-        return ResponseEntity.ok(
-                ApiResponse.<List<OrderDetailResponse>>builder()
-                        .statusCode(HttpStatus.OK.value())
-                        .message("Fetched order details sorted by oldest first")
-                        .data(responses)
-                        .build());
-    }
-
-    @GetMapping("/ready")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
-    @Operation(summary = "Get a list of order details with status READY, excluding SERVED")
-    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getReadyOrders() {
-        List<OrderDetailResponse> responses = orderDetailService.getReadyOrderDetails();
-        return ResponseEntity.ok(
-                ApiResponse.<List<OrderDetailResponse>>builder()
-                        .statusCode(HttpStatus.OK.value())
-                        .message("Fetched READY order details successfully")
-                        .data(responses)
-                        .build());
-    }
 }
