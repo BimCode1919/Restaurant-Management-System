@@ -65,18 +65,24 @@ public class DiscountCalculationService {
         }
 
         if (discount.getUsageLimit() != null &&
-            discount.getUsedCount() >= discount.getUsageLimit()) {
+                discount.getUsedCount() >= discount.getUsageLimit()) {
             throw new InvalidOperationException("Discount usage limit reached");
         }
 
         if (discount.getMinOrderAmount() != null &&
-            orderTotal.compareTo(discount.getMinOrderAmount()) < 0) {
+                orderTotal.compareTo(discount.getMinOrderAmount()) < 0) {
             throw new InvalidOperationException(
-                "Order total must be at least " + discount.getMinOrderAmount()
-            );
+                    "Order total must be at least " + discount.getMinOrderAmount());
         }
 
+        // Type-specific validation — checked here so isSilentlyApplicable filters bad data out
         switch (discount.getDiscountType()) {
+            case BILL_TIER -> {
+                if (discount.getTierConfig() == null || discount.getTierConfig().isBlank()) {
+                    throw new InvalidOperationException(
+                            "BILL_TIER discount '" + discount.getName() + "' has no tier configuration");
+                }
+            }
             case HOLIDAY -> validateHolidayDiscount(discount, orderDateTime);
             case PARTY_SIZE -> validatePartySizeDiscount(discount, partySize);
         }
