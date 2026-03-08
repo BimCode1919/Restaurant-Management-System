@@ -235,7 +235,11 @@ public class DiscountService {
             discountCalculationService.validateDiscountApplicability(
                     discount, bill.getTotalPrice(), bill.getPartySize(), now);
             return true;
-        } catch (Exception e) {
+        } catch (InvalidOperationException e) {
+        log.debug("Discount {} not applicable: {}", discount.getId(), e.getMessage());
+        return false;
+    } catch (Exception e) {
+            log.warn("Unexpected error checking discount {}", discount.getId(), e);
             return false;
         }
     }
@@ -243,59 +247,59 @@ public class DiscountService {
     /**
      * Check if discount is applicable to the bill
      */
-    private boolean isDiscountApplicable(Discount discount, Bill bill, LocalDateTime now) {
-        // Check date range
-        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
-            return false;
-        }
-        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
-            return false;
-        }
-
-        // Check usage limit
-        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) {
-            return false;
-        }
-
-        // Check minimum order amount
-        if (discount.getMinOrderAmount() != null && 
-            bill.getTotalPrice().compareTo(discount.getMinOrderAmount()) < 0) {
-            return false;
-        }
-
-        // Check party size
-        if (discount.getMinPartySize() != null && 
-            (bill.getPartySize() == null || bill.getPartySize() < discount.getMinPartySize())) {
-            return false;
-        }
-        if (discount.getMaxPartySize() != null && 
-            (bill.getPartySize() == null || bill.getPartySize() > discount.getMaxPartySize())) {
-            return false;
-        }
-
-        // Check applicable days
-        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()) {
-            if (!isApplicableDay(discount.getApplicableDays(), now)) {
-                return false;
-            }
-        }
-
-        // Type-specific checks
-        switch (discount.getDiscountType()) {
-            case ITEM_SPECIFIC:
-                return hasApplicableItems(discount, bill);
-            case HOLIDAY:
-                return isApplicableDay(discount.getApplicableDays(), now);
-            case PARTY_SIZE:
-                return bill.getPartySize() != null && 
-                       bill.getPartySize() >= (discount.getMinPartySize() != null ? discount.getMinPartySize() : 1);
-            case BILL_TIER:
-                return bill.getTotalPrice().compareTo(discount.getMinOrderAmount() != null ? 
-                       discount.getMinOrderAmount() : BigDecimal.ZERO) >= 0;
-            default:
-                return true;
-        }
-    }
+//    private boolean isDiscountApplicable(Discount discount, Bill bill, LocalDateTime now) {
+//        // Check date range
+//        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
+//            return false;
+//        }
+//        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
+//            return false;
+//        }
+//
+//        // Check usage limit
+//        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) {
+//            return false;
+//        }
+//
+//        // Check minimum order amount
+//        if (discount.getMinOrderAmount() != null &&
+//            bill.getTotalPrice().compareTo(discount.getMinOrderAmount()) < 0) {
+//            return false;
+//        }
+//
+//        // Check party size
+//        if (discount.getMinPartySize() != null &&
+//            (bill.getPartySize() == null || bill.getPartySize() < discount.getMinPartySize())) {
+//            return false;
+//        }
+//        if (discount.getMaxPartySize() != null &&
+//            (bill.getPartySize() == null || bill.getPartySize() > discount.getMaxPartySize())) {
+//            return false;
+//        }
+//
+//        // Check applicable days
+//        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()) {
+//            if (!isApplicableDay(discount.getApplicableDays(), now)) {
+//                return false;
+//            }
+//        }
+//
+//        // Type-specific checks
+//        switch (discount.getDiscountType()) {
+//            case ITEM_SPECIFIC:
+//                return hasApplicableItems(discount, bill);
+//            case HOLIDAY:
+//                return isApplicableDay(discount.getApplicableDays(), now);
+//            case PARTY_SIZE:
+//                return bill.getPartySize() != null &&
+//                       bill.getPartySize() >= (discount.getMinPartySize() != null ? discount.getMinPartySize() : 1);
+//            case BILL_TIER:
+//                return bill.getTotalPrice().compareTo(discount.getMinOrderAmount() != null ?
+//                       discount.getMinOrderAmount() : BigDecimal.ZERO) >= 0;
+//            default:
+//                return true;
+//        }
+//    }
 
     /**
      * Check if current day is applicable
@@ -304,12 +308,10 @@ public class DiscountService {
         if (applicableDays == null || applicableDays.isEmpty()) {
             return true;
         }
-
-        DayOfWeek currentDay = dateTime.getDayOfWeek();
-        String dayName = currentDay.toString();
-        
-        // applicableDays format: "MONDAY,FRIDAY,SATURDAY"
-        return applicableDays.toUpperCase().contains(dayName);
+        Set<String> days = Arrays.stream(applicableDays.toUpperCase().split(","))
+                .map(String::trim)
+                .collect(Collectors.toSet());
+        return days.contains(dateTime.getDayOfWeek().toString());
     }
 
     /**
@@ -355,37 +357,37 @@ public class DiscountService {
     /**
      * Calculate item-specific discount
      */
-    private BigDecimal calculateItemSpecificDiscount(Discount discount, Bill bill) {
-        BigDecimal totalDiscount = BigDecimal.ZERO;
-
-        Set<Long> discountItemIds = discount.getItems().stream()
-                .map(Item::getId)
-                .collect(Collectors.toSet());
-
-        for (var order : bill.getOrders()) {
-            for (OrderDetail detail : order.getOrderDetails()) {
-                if (discountItemIds.contains(detail.getItem().getId())) {
-                    BigDecimal itemTotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));
-                    
-                    if (discount.getValueType() == DiscountValueType.PERCENTAGE) {
-                        totalDiscount = totalDiscount.add(calculatePercentageDiscount(discount.getValue(), itemTotal));
-                    } else if (discount.getValueType() == DiscountValueType.FIXED_AMOUNT) {
-                        totalDiscount = totalDiscount.add(discount.getValue().multiply(BigDecimal.valueOf(detail.getQuantity())));
-                    }
-                }
-            }
-        }
-
-        return totalDiscount;
-    }
+//    private BigDecimal calculateItemSpecificDiscount(Discount discount, Bill bill) {
+//        BigDecimal totalDiscount = BigDecimal.ZERO;
+//
+//        Set<Long> discountItemIds = discount.getItems().stream()
+//                .map(Item::getId)
+//                .collect(Collectors.toSet());
+//
+//        for (var order : bill.getOrders()) {
+//            for (OrderDetail detail : order.getOrderDetails()) {
+//                if (discountItemIds.contains(detail.getItem().getId())) {
+//                    BigDecimal itemTotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));
+//
+//                    if (discount.getValueType() == DiscountValueType.PERCENTAGE) {
+//                        totalDiscount = totalDiscount.add(calculatePercentageDiscount(discount.getValue(), itemTotal));
+//                    } else if (discount.getValueType() == DiscountValueType.FIXED_AMOUNT) {
+//                        totalDiscount = totalDiscount.add(discount.getValue().multiply(BigDecimal.valueOf(detail.getQuantity())));
+//                    }
+//                }
+//            }
+//        }
+//
+//        return totalDiscount;
+//    }
 
     /**
      * Calculate percentage discount
      */
-    private BigDecimal calculatePercentageDiscount(BigDecimal percentage, BigDecimal amount) {
-        return amount.multiply(percentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-    }
+//    private BigDecimal calculatePercentageDiscount(BigDecimal percentage, BigDecimal amount) {
+//        return amount.multiply(percentage)
+//                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+//    }
 
     /**
      * Calculate tier-based discount
@@ -427,6 +429,9 @@ public class DiscountService {
         if (!discount.getActive()) {
             throw new IllegalStateException("Discount is not active");
         }
+        discountCalculationService.validateDiscountApplicability(
+                discount, bill.getTotalPrice(), bill.getPartySize(), LocalDateTime.now()
+        );
 
         DiscountCalculationResult result = calculateDiscountAmount(discount, bill);
 
