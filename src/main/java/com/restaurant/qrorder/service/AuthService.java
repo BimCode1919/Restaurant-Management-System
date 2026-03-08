@@ -4,12 +4,14 @@ import com.restaurant.qrorder.domain.common.UserRole;
 import com.restaurant.qrorder.domain.dto.request.LoginRequest;
 import com.restaurant.qrorder.domain.dto.request.RegisterRequest;
 import com.restaurant.qrorder.domain.dto.response.AuthResponse;
+import com.restaurant.qrorder.domain.entity.RestaurantTable;
 import com.restaurant.qrorder.domain.entity.Role;
 import com.restaurant.qrorder.domain.entity.User;
 import com.restaurant.qrorder.exception.custom.AuthenticationException;
 import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.mapper.UserMapper;
+import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import com.restaurant.qrorder.repository.RoleRepository;
 import com.restaurant.qrorder.repository.UserRepository;
 import com.restaurant.qrorder.util.JwtUtil;
@@ -18,11 +20,16 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static lombok.AccessLevel.PRIVATE;
 
@@ -39,6 +46,7 @@ public class AuthService {
     AuthenticationManager authenticationManager;
     UserDetailsService userDetailsService;
     UserMapper userMapper;
+    RestaurantTableRepository tableRepository;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -130,6 +138,34 @@ public class AuthService {
                 .token(newToken)
                 .refreshToken(refreshToken)
                 .user(userMapper.toResponse(user))
+                .build();
+    }
+
+    public AuthResponse createGuestSession(String qrCode) {
+
+        RestaurantTable table = tableRepository.findByQrCode(qrCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Table not found"));
+
+        String guestEmail = "guest_" + table.getTableNumber() + "_" + System.currentTimeMillis();
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", "CUSTOMER");
+        claims.put("tableId", table.getId());
+        claims.put("tableNumber", table.getTableNumber());
+        claims.put("guest", true);
+
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                guestEmail,
+                "",
+                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
+        );
+
+        String token = jwtUtil.generateToken(claims, userDetails);
+        String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
                 .build();
     }
 }

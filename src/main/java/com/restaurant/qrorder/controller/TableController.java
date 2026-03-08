@@ -76,7 +76,7 @@ public class TableController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CUSTOMER')")
     @Operation(summary = "Get available tables", description = "Retrieve all currently available tables")
     public ResponseEntity<ApiResponse<List<TableResponse>>> getAvailableTables() {
         return ResponseEntity.ok(
