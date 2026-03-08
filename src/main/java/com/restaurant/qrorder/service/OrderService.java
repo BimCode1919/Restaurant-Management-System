@@ -1,5 +1,6 @@
 package com.restaurant.qrorder.service;
 
+import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.common.ItemStatus;
 import com.restaurant.qrorder.domain.common.OrderType;
 import com.restaurant.qrorder.domain.dto.request.CreateOrderRequest;
@@ -43,8 +44,8 @@ public class OrderService {
         // Get bill and validate
         Bill bill = billService.getBillById(request.getBillId());
         
-        if (bill.getStatus() != com.restaurant.qrorder.domain.common.BillStatus.OPEN) {
-            throw new InvalidOperationException("Cannot add order to a non-open bill");
+        if (bill.getStatus() != BillStatus.OPEN && bill.getStatus() != BillStatus.MERGED) {
+            throw new InvalidOperationException("Cannot add order to a non-open bill and not megrged bill");
         }
         
         // Get current user

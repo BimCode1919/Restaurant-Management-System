@@ -390,31 +390,31 @@ public class DiscountService {
     /**
      * Calculate tier-based discount
      */
-//    private BigDecimal calculateTierDiscount(Discount discount, BigDecimal totalPrice) {
-//        if (discount.getTierConfig() == null || discount.getTierConfig().isEmpty()) {
-//            // Fallback to simple percentage
-//            return calculatePercentageDiscount(discount.getValue(), totalPrice);
-//        }
-//
-//        // Parse tier config: "500000:5,1000000:10,2000000:15"
-//        // Format: "minAmount:discountPercent,..."
-//        String[] tiers = discount.getTierConfig().split(",");
-//        BigDecimal applicableDiscount = BigDecimal.ZERO;
-//
-//        for (String tier : tiers) {
-//            String[] parts = tier.split(":");
-//            if (parts.length == 2) {
-//                BigDecimal minAmount = new BigDecimal(parts[0].trim());
-//                BigDecimal discountPercent = new BigDecimal(parts[1].trim());
-//
-//                if (totalPrice.compareTo(minAmount) >= 0) {
-//                    applicableDiscount = discountPercent;
-//                }
-//            }
-//        }
-//
-//        return calculatePercentageDiscount(applicableDiscount, totalPrice);
-//    }
+    private BigDecimal calculateTierDiscount(Discount discount, BigDecimal totalPrice) {
+        if (discount.getTierConfig() == null || discount.getTierConfig().isEmpty()) {
+            // Fallback to simple percentage
+            return calculatePercentageDiscount(discount.getValue(), totalPrice);
+        }
+
+        // Parse tier config: "500000:5,1000000:10,2000000:15"
+        // Format: "minAmount:discountPercent,..."
+        String[] tiers = discount.getTierConfig().split(",");
+        BigDecimal applicableDiscount = BigDecimal.ZERO;
+
+        for (String tier : tiers) {
+            String[] parts = tier.split(":");
+            if (parts.length == 2) {
+                BigDecimal minAmount = new BigDecimal(parts[0].trim());
+                BigDecimal discountPercent = new BigDecimal(parts[1].trim());
+
+                if (totalPrice.compareTo(minAmount) >= 0) {
+                    applicableDiscount = discountPercent;
+                }
+            }
+        }
+
+        return calculatePercentageDiscount(applicableDiscount, totalPrice);
+    }
 
     /**
      * Apply discount to bill

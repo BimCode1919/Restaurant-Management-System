@@ -179,22 +179,27 @@ public class BillService {
             throw new InvalidOperationException("Can only apply discount to open bills");
         }
 
+        DiscountResponse discountResponse = discountService.findBestDiscount(bill);
+
         // ← use the new method that finds AND applies in one call
-        DiscountService.DiscountCalculationResult result =
-                discountService.applyBestDiscountToBill(bill);
+
+        discountService.applyDiscountToBill(bill, discountResponse.getId());
 
         Bill savedBill = billRepository.save(bill);
 
-        if (result.getDiscountId() != null) {
+        if (discountResponse.getId() != null) {
             log.info("Applied best discount [{}] to bill [{}]: discountAmount={}, finalPrice={}",
-                    result.getDiscountName(), billId,
-                    result.getDiscountAmount(), result.getFinalAmount());
+                    discountResponse.getName(), billId,
+                    discountResponse.getMaxDiscountAmount(),
+                    discountResponse.getCalculatedAmount());
         } else {
             log.info("No applicable discount found for bill [{}]", billId);
         }
 
         return mapToResponse(savedBill);
     }
+
+
 
     /**
      * Apply specific discount to bill
