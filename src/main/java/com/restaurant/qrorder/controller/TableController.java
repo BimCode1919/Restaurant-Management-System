@@ -36,7 +36,7 @@ public class TableController {
     private final TableService tableService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get all tables", description = "Retrieve all restaurant tables (Admin/Staff only)")
     public ResponseEntity<ApiResponse<List<TableResponse>>> getAllTables() {
         return ResponseEntity.ok(
@@ -48,7 +48,7 @@ public class TableController {
     }
 
     @GetMapping("/by-date")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get all tables by date", description = "Retrieve all tables with availability status for a specific date.")
     public ResponseEntity<ApiResponse<List<TableResponse>>> getAllTablesByDate(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -64,7 +64,7 @@ public class TableController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get table by ID", description = "Retrieve a specific table by its ID (Admin/Staff only)")
     public ResponseEntity<ApiResponse<TableResponse>> getTableById(@PathVariable Long id) {
         return ResponseEntity.ok(
