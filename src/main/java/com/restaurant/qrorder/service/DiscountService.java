@@ -445,16 +445,17 @@ public class DiscountService {
      * Find best discount for bill
      */
     public DiscountResponse findBestDiscount(Bill bill) {
-        DiscountCalculationResult result = calculateBillDiscount(bill);
+        log.debug("Finding best discount for bill ID: {}", bill.getId());
 
-        if (result.getDiscountId() == null) return null;
-
-        Discount discount = discountRepository.findById(result.getDiscountId()).orElse(null);
-        if (discount == null) return null;
-
-        DiscountResponse response = discountMapper.toResponse(discount);
-        response.setCalculatedAmount(result.getDiscountAmount());
-        return response;
+        return getApplicableDiscounts(bill).stream()
+                .map(discount -> {
+                    DiscountCalculationResult result = calculateDiscountAmount(discount, bill);
+                    DiscountResponse response = discountMapper.toResponse(discount);
+                    response.setCalculatedAmount(result.getDiscountAmount());
+                    return response;
+                })
+                .max(Comparator.comparing(DiscountResponse::getCalculatedAmount))
+                .orElse(null);
     }
 
     // ==================== HELPER CLASSES ====================
