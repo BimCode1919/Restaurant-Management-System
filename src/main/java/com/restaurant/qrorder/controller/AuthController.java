@@ -7,6 +7,7 @@ import com.restaurant.qrorder.domain.dto.response.AuthResponse;
 import com.restaurant.qrorder.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -81,6 +82,21 @@ public class AuthController {
                 ApiResponse.<AuthResponse>builder()
                         .statusCode(HttpStatus.OK.value())
                         .message("Guest session created successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @PostMapping("/guest-session")
+    @Operation(summary = "Create guest token without table")
+    public ResponseEntity<ApiResponse<AuthResponse>> createGuestToken() {
+
+        AuthResponse response = authService.createGuestToken();
+
+        return ResponseEntity.ok(
+                ApiResponse.<AuthResponse>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Guest token created successfully")
                         .data(response)
                         .build()
         );
