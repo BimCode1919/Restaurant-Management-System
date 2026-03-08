@@ -29,7 +29,7 @@ public class BillController {
     private final BillService billService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CUSTOMER')")
     @Operation(summary = "Create bill", description = "Create a new bill for tables (Admin/Staff only)")
     public ResponseEntity<ApiResponse<BillResponse>> createBill(@Valid @RequestBody CreateBillRequest request) {
         BillResponse response = billService.createBill(request);
