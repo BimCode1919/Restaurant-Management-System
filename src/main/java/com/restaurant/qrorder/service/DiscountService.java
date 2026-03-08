@@ -36,6 +36,76 @@ public class DiscountService {
     DiscountRepository discountRepository;
     DiscountMapper discountMapper;
 
+//------------------------------------------------------------------------------------------------------------------
+@Transactional
+public DiscountCalculationResult applyBestDiscountToBill(Bill bill) {
+    log.debug("Applying best discount to bill ID: {}", bill.getId());
+
+    // Step 1: Get all applicable discounts
+    List<Discount> applicableDiscounts = getApplicableDiscounts(bill);
+
+    if (applicableDiscounts.isEmpty()) {
+        log.info("No applicable discounts found for bill ID: {}", bill.getId());
+        bill.setDiscount(null);
+        bill.setDiscountAmount(BigDecimal.ZERO);
+        bill.setFinalPrice(bill.getTotalPrice());
+        return DiscountCalculationResult.noDiscount();
+    }
+
+    // Step 2: Calculate discount amount for each and pick the best
+    DiscountCalculationResult bestResult = applicableDiscounts.stream()
+            .map(discount -> calculateDiscountAmount(discount, bill))
+            .max(Comparator.comparing(DiscountCalculationResult::getDiscountAmount))
+            .orElse(DiscountCalculationResult.noDiscount());
+
+    if (bestResult.getDiscountId() == null) {
+        bill.setDiscount(null);
+        bill.setDiscountAmount(BigDecimal.ZERO);
+        bill.setFinalPrice(bill.getTotalPrice());
+        return DiscountCalculationResult.noDiscount();
+    }
+
+    // Step 3: Fetch the winning discount entity
+    Discount bestDiscount = discountRepository.findById(bestResult.getDiscountId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    "Discount not found with id: " + bestResult.getDiscountId()));
+
+    // Step 4: If bill already has a different discount applied, decrement its usage count
+    if (bill.getDiscount() != null
+            && !bill.getDiscount().getId().equals(bestDiscount.getId())) {
+        Discount previousDiscount = bill.getDiscount();
+        previousDiscount.setUsedCount(Math.max(0, previousDiscount.getUsedCount() - 1));
+        discountRepository.save(previousDiscount);
+        log.info("Decremented usage count for previous discount [{}]", previousDiscount.getId());
+    }
+
+    // Step 5: Apply best discount to bill
+    boolean isNewDiscount = bill.getDiscount() == null
+            || !bill.getDiscount().getId().equals(bestDiscount.getId());
+
+    bill.setDiscount(bestDiscount);
+    bill.setDiscountAmount(bestResult.getDiscountAmount());
+    bill.setFinalPrice(bill.getTotalPrice().subtract(bestResult.getDiscountAmount()));
+
+    // Step 6: Increment usage count only if this is a newly applied discount
+    if (isNewDiscount) {
+        bestDiscount.setUsedCount(bestDiscount.getUsedCount() + 1);
+        discountRepository.save(bestDiscount);
+    }
+
+    log.info("Applied best discount [{}] to bill [{}]: discountAmount={}, finalPrice={}",
+            bestDiscount.getName(),
+            bill.getId(),
+            bestResult.getDiscountAmount(),
+            bestResult.getFinalAmount());
+    bestResult.setFinalAmount(bill.getTotalPrice().subtract(bestResult.getDiscountAmount()));
+    return bestResult;
+}
+
+    /**
+     * Find best discount for bill (read-only, does NOT apply it)
+     */
+
     @Transactional(readOnly = true)
     public List<DiscountResponse> getAllDiscounts() {
         log.debug("Fetching all discounts");
@@ -268,14 +338,14 @@ public class DiscountService {
     /**
      * Get all applicable discounts for a bill
      */
-    private List<Discount> getApplicableDiscounts(Bill bill) {
-        LocalDateTime now = LocalDateTime.now();
-        List<Discount> activeDiscounts = discountRepository.findActiveDiscounts(now);
+        private List<Discount> getApplicableDiscounts(Bill bill) {
+            LocalDateTime now = LocalDateTime.now();
+            List<Discount> activeDiscounts = discountRepository.findActiveDiscounts(now);
 
-        return activeDiscounts.stream()
-                .filter(discount -> isDiscountApplicable(discount, bill, now))
-                .collect(Collectors.toList());
-    }
+            return activeDiscounts.stream()
+                    .filter(discount -> isDiscountApplicable(discount, bill, now))
+                    .collect(Collectors.toList());
+        }
 
     /**
      * Check if discount is applicable to the bill
@@ -379,10 +449,12 @@ public class DiscountService {
                 break;
             
             case HOLIDAY:
+
+                break;
             case PARTY_SIZE:
                 discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
                 break;
-            
+
             case BILL_TIER:
                 discountAmount = calculateTierDiscount(discount, totalPrice);
                 break;
@@ -497,23 +569,26 @@ public class DiscountService {
     /**
      * Find best discount for bill
      */
+    @Transactional(readOnly = true)
     public DiscountResponse findBestDiscount(Bill bill) {
-        DiscountCalculationResult result = calculateBillDiscount(bill);
-        
-        if (result.getDiscountId() == null) {
+        log.debug("Finding best discount for bill ID: {}", bill.getId());
+
+        List<Discount> applicableDiscounts = getApplicableDiscounts(bill);
+
+        if (applicableDiscounts.isEmpty()) {
+            log.info("No applicable discounts for bill ID: {}", bill.getId());
             return null;
         }
 
-        Discount discount = discountRepository.findById(result.getDiscountId())
+        return applicableDiscounts.stream()
+                .map(discount -> {
+                    DiscountCalculationResult result = calculateDiscountAmount(discount, bill);
+                    DiscountResponse response = discountMapper.toResponse(discount);
+                    response.setCalculatedAmount(result.getDiscountAmount());
+                    return response;
+                })
+                .max(Comparator.comparing(DiscountResponse::getCalculatedAmount))
                 .orElse(null);
-
-        if (discount == null) {
-            return null;
-        }
-
-        DiscountResponse response = discountMapper.toResponse(discount);
-        response.setCalculatedAmount(result.getDiscountAmount());
-        return response;
     }
 
     // ==================== HELPER CLASSES ====================
