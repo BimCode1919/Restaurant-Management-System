@@ -68,4 +68,21 @@ public class AuthController {
                         .data(authService.refreshToken(refreshToken))
                         .build());
     }
+
+    @PostMapping("/guest-session/{qrCode}")
+    @Operation(summary = "Create guest session from table QR")
+    public ResponseEntity<ApiResponse<AuthResponse>> createGuestSession(
+            @PathVariable String qrCode
+    ) {
+
+        AuthResponse response = authService.createGuestSession(qrCode);
+
+        return ResponseEntity.ok(
+                ApiResponse.<AuthResponse>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Guest session created successfully")
+                        .data(response)
+                        .build()
+        );
+    }
 }
