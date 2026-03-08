@@ -1,6 +1,7 @@
 package com.restaurant.qrorder.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.restaurant.qrorder.domain.common.PaymentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -43,6 +45,9 @@ public class MoMoPaymentService {
 
     @Value("${momo.notify-url:http://localhost:8080/api/payments/momo/notify}")
     private String notifyUrl;
+
+    @Value("${momo.query-url:https://test-payment.momo.vn/v2/gateway/api/query}")
+    private String momoQueryUrl; // ✅ add this with the other @Value fields
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -160,21 +165,52 @@ public class MoMoPaymentService {
     /**
      * Check payment status with MoMo
      */
-    public MoMoPaymentStatus checkPaymentStatus(String requestId) {
+    public MoMoPaymentStatus checkPaymentStatus(String momoOrderId, String momoRequestId) {
         try {
-            // In production, call MoMo query API
-            // For now, return mock status
-            log.info("Checking MoMo payment status for request: {}", requestId);
+            String rawHash = "accessKey=" + accessKey +
+                    "&orderId=" + momoOrderId +
+                    "&partnerCode=" + partnerCode +
+                    "&requestId=" + momoRequestId;
+
+            String signature = hmacSHA256(rawHash, secretKey);
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("partnerCode", partnerCode);
+            body.put("requestId",   momoRequestId);
+            body.put("orderId",     momoOrderId);
+            body.put("lang",        "en");
+            body.put("signature",   signature);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    momoQueryUrl,   // e.g. https://test-payment.momo.vn/v2/gateway/api/query
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    Map.class
+            );
+
+            Map<String, Object> result = response.getBody();
+            if (result == null) {
+                return MoMoPaymentStatus.builder().failed(true).message("Empty response from MoMo").build();
+            }
+
+            int resultCode = ((Number) result.get("resultCode")).intValue();
+            String message  = (String) result.getOrDefault("message", "");
+            String transId  = String.valueOf(result.getOrDefault("transId", ""));
 
             return MoMoPaymentStatus.builder()
-                    .completed(false)
-                    .failed(false)
-                    .pending(true)
-                    .message("Payment is pending")
+                    .completed(resultCode == 0)
+                    .failed(resultCode != 0 && resultCode != 1000)
+                    .pending(resultCode == 1000)   // 1000 = still processing
+                    .resultCode(resultCode)
+                    .message(message)
+                    .transId(transId)
                     .build();
 
         } catch (Exception e) {
-            log.error("Error checking MoMo payment status", e);
+            log.error("Error checking MoMo payment status for order {}", momoOrderId, e);
             return MoMoPaymentStatus.builder()
                     .failed(true)
                     .message("Error checking status: " + e.getMessage())
@@ -187,7 +223,7 @@ public class MoMoPaymentService {
      */
     public boolean refundPayment(String transId, BigDecimal refundAmount, String reason) {
         try {
-            log.info("Processing MoMo refund - TransID: {}, Amount: {}, Reason: {}", 
+            log.info("Processing MoMo refund - TransID: {}, Amount  : {}, Reason: {}",
                     transId, refundAmount, reason);
 
             // In production, call MoMo refund API
@@ -272,7 +308,25 @@ public class MoMoPaymentService {
         private boolean completed;
         private boolean failed;
         private boolean pending;
-        private String transId;
-        private String message;
+        private int     resultCode;
+        private String  message;
+        private String  transId;
+
+        public PaymentStatus toPaymentStatus() {
+
+            if (isCompleted()) {
+                return PaymentStatus.COMPLETED;
+            }
+
+            if (isPending()) {
+                return PaymentStatus.PENDING;
+            }
+
+            if (isFailed()) {
+                return PaymentStatus.FAILED;
+            }
+
+            return PaymentStatus.PENDING;
+        }// ✅ MoMo transaction ID to store on Payment
     }
 }
