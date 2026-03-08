@@ -168,4 +168,27 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .build();
     }
+
+    public AuthResponse createGuestToken() {
+
+        String guestUsername = "guest_" + System.currentTimeMillis();
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", "CUSTOMER");
+        claims.put("guest", true);
+
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                guestUsername,
+                "",
+                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
+        );
+
+        String token = jwtUtil.generateToken(claims, userDetails);
+        String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .build();
+    }
 }
