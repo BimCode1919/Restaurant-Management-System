@@ -64,5 +64,11 @@ public class OrderDetailService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
+    @Transactional(readOnly = true)
+    public List<OrderDetailResponse> getPreparingOrderDetails() {
+        return orderDetailRepository.findPreparingOrderDetailsSortedByOrderCreatedAt().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
 }
