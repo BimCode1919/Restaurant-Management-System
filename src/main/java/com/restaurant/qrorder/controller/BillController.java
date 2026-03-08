@@ -2,6 +2,7 @@ package com.restaurant.qrorder.controller;
 
 import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateBillRequest;
+import com.restaurant.qrorder.domain.dto.request.MergeBillRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.BillResponse;
 import com.restaurant.qrorder.service.BillService;
@@ -129,6 +130,19 @@ public class BillController {
                 ApiResponse.<BillResponse>builder()
                         .statusCode(HttpStatus.OK.value())
                         .message("Bill closed successfully")
+                        .data(response)
+                        .build());
+    }
+
+    @PostMapping("/merge")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Merge Bill", description = "Merge open bills")
+    public ResponseEntity<ApiResponse<BillResponse>> mergeBills(@Valid @RequestBody MergeBillRequest request) {
+        BillResponse response = billService.mergeBills(request.getBillIds());
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<BillResponse>builder()
+                        .statusCode(HttpStatus.CREATED.value())
+                        .message("Bills merged successfully")
                         .data(response)
                         .build());
     }

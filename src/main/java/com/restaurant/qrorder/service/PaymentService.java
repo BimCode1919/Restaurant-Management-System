@@ -49,6 +49,9 @@ public class PaymentService {
         if (bill.getStatus() == BillStatus.CANCELLED) {
             throw new RuntimeException("Cannot pay a cancelled bill");
         }
+        if (bill.getStatus() == BillStatus.MERGED) {
+            throw new RuntimeException("Bill has been merged into another bill and cannot be paid directly");
+        }
 
         // Check if payment already exists
         paymentRepository.findByBillId(bill.getId())
