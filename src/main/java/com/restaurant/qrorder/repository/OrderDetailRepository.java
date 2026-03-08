@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> {
-    @Query("SELECT od FROM OrderDetail od JOIN FETCH od.order o JOIN FETCH od.item WHERE 1=1 ORDER BY o.createdAt ASC")
-    List<OrderDetail> findAllSortedByOrderCreatedAt();
+    @Query("SELECT od FROM OrderDetail od JOIN FETCH od.order o JOIN FETCH od.item WHERE od.itemStatus = 'PENDING' ORDER BY o.createdAt ASC")
+    List<OrderDetail> findPendingOrderDetailsSortedByOrderCreatedAt();
+    @Query("SELECT od FROM OrderDetail od JOIN FETCH od.order o JOIN FETCH od.item WHERE od.itemStatus = 'READY' ORDER BY o.createdAt ASC")
+    List<OrderDetail> findReadyOrderDetailsSortedByOrderCreatedAt();
 }
