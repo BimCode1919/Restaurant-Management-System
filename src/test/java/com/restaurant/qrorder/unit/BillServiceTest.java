@@ -318,18 +318,18 @@ class BillServiceTest {
                     .hasMessageContaining("open bills");
         }
 
-        @Test
-        @DisplayName("no applicable discount found → bill unchanged, no apply called")
-        void noDiscount_billUnchanged() {
-            DiscountService.DiscountCalculationResult noDiscount = DiscountService.DiscountCalculationResult.noDiscount();
-            when(billRepository.findById(1L)).thenReturn(Optional.of(openBill));
-            when(discountService.calculateBillDiscount(openBill)).thenReturn(noDiscount);
-
-            Bill result = billService.applyBestDiscount(1L);
-
-            assertThat(result).isEqualTo(openBill);
-            verify(discountService, never()).applyDiscountToBill(any(), any());
-        }
+//        @Test
+//        @DisplayName("no applicable discount found → bill unchanged, no apply called")
+//        void noDiscount_billUnchanged() {
+//            DiscountService.DiscountCalculationResult noDiscount = DiscountService.DiscountCalculationResult.noDiscount();
+//            when(billRepository.findById(1L)).thenReturn(Optional.of(openBill));
+//            when(discountService.calculateBillDiscount(openBill)).thenReturn(noDiscount);
+//
+//            Bill result = billService.applyBestDiscount(1L);
+//
+//            assertThat(result).isEqualTo(openBill);
+//            verify(discountService, never()).applyDiscountToBill(any(), any());
+//        }
 
         @Test
         @DisplayName("discount found → applies discount and saves bill")

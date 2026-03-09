@@ -172,26 +172,28 @@ public class BillService {
      * Calculate and apply best discount to bill
      */
     @Transactional
-    public Bill applyBestDiscount(Long billId) {
+    public BillResponse applyBestDiscount(Long billId) {
         Bill bill = getBillById(billId);
 
         if (bill.getStatus() != BillStatus.OPEN) {
-            throw new RuntimeException("Can only apply discount to open bills");
+            throw new InvalidOperationException("Can only apply discount to open bills");
         }
 
-        DiscountService.DiscountCalculationResult result = discountService.calculateBillDiscount(bill);
+        // ← use the new method that finds AND applies in one call
+        DiscountService.DiscountCalculationResult result =
+                discountService.applyBestDiscountToBill(bill);
+
+        Bill savedBill = billRepository.save(bill);
 
         if (result.getDiscountId() != null) {
-            discountService.applyDiscountToBill(bill, result.getDiscountId());
-            bill = billRepository.save(bill);
-            
-            log.info("Applied best discount to bill {}: {} (Amount: {})",
-                    billId, result.getDiscountName(), result.getDiscountAmount());
+            log.info("Applied best discount [{}] to bill [{}]: discountAmount={}, finalPrice={}",
+                    result.getDiscountName(), billId,
+                    result.getDiscountAmount(), result.getFinalAmount());
         } else {
-            log.info("No applicable discount found for bill {}", billId);
+            log.info("No applicable discount found for bill [{}]", billId);
         }
 
-        return bill;
+        return mapToResponse(savedBill);
     }
 
     /**
