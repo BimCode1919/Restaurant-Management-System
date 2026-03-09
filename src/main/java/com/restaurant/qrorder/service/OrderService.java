@@ -10,10 +10,7 @@ import com.restaurant.qrorder.domain.dto.response.OrderResponse;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
-import com.restaurant.qrorder.repository.ItemRepository;
-import com.restaurant.qrorder.repository.OrderRepository;
-import com.restaurant.qrorder.repository.RoleRepository;
-import com.restaurant.qrorder.repository.UserRepository;
+import com.restaurant.qrorder.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -37,6 +34,7 @@ public class OrderService {
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final OrderDetailRepository orderDetailRepository;
 
     /**
      * Create new order
@@ -171,6 +169,27 @@ public class OrderService {
         billService.recalculateBill(bill.getId());
 
         log.info("Order {} deleted successfully", orderId);
+    }
+    @Transactional
+    public List<OrderDetailResponse> massUpdateOrderItemStatus(Long orderId)
+    {
+        log.info("Mass update order items with orderId: {}", orderId);
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+        List<OrderDetail> orderDetailList = order.getOrderDetails();
+        if(orderDetailList.isEmpty()) {
+            throw new InvalidOperationException("Can't update an empty order");
+        }
+        List<OrderDetailResponse> orderDetailResponseList = new ArrayList<>();
+        for(OrderDetail orderDetail : orderDetailList)
+        {
+            if (orderDetail.getItemStatus() == ItemStatus.CANCELLED) {
+                continue;
+            }
+            orderDetail.setItemStatus(ItemStatus.READY);
+         orderDetailResponseList.add(mapOrderDetailToResponse(orderDetailRepository.save(orderDetail)));
+            log.info("Successfully updated order detail with id:", orderDetail.getId());
+        }
+        return orderDetailResponseList;
     }
 
     /**
