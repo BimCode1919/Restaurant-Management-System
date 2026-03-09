@@ -41,4 +41,29 @@ public class OrderDetailController {
                         .data(responses)
                         .build());
     }
+
+    @GetMapping("/ready")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
+    @Operation(summary = "Get a list of order details with status READY, excluding SERVED")
+    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getReadyOrders() {
+        List<OrderDetailResponse> responses = orderDetailService.getReadyOrderDetails();
+        return ResponseEntity.ok(
+                ApiResponse.<List<OrderDetailResponse>>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Fetched READY order details successfully")
+                        .data(responses)
+                        .build());
+    }
+    @GetMapping("/preparing")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
+    @Operation(summary = "Get a list of order details with status READY, excluding SERVED")
+    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getPreparingOrders() {
+        List<OrderDetailResponse> responses = orderDetailService.getPreparingOrderDetails();
+        return ResponseEntity.ok(
+                ApiResponse.<List<OrderDetailResponse>>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Fetched Preparing order details successfully")
+                        .data(responses)
+                        .build());
+    }
 }

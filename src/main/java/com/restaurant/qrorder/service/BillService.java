@@ -10,6 +10,7 @@ import com.restaurant.qrorder.domain.dto.response.OrderResponse;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
+import com.restaurant.qrorder.mapper.DiscountMapper;
 import com.restaurant.qrorder.repository.BillRepository;
 import com.restaurant.qrorder.repository.ReservationRepository;
 import com.restaurant.qrorder.repository.RestaurantTableRepository;
@@ -21,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +36,7 @@ public class BillService {
     private final DiscountService discountService;
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+    private final DiscountMapper discountMapper;
 
     /**
      * Create new bill
@@ -288,7 +292,7 @@ public class BillService {
                 .id(bill.getId())
                 .totalPrice(bill.getTotalPrice())
                 .partySize(bill.getPartySize())
-                .discount(bill.getDiscount() != null ? mapDiscountToResponse(bill.getDiscount()) : null)
+                .discount(bill.getDiscount() != null ? discountMapper.toResponse(bill.getDiscount()) : null)
                 .discountAmount(bill.getDiscountAmount())
                 .finalPrice(bill.getFinalPrice())
                 .status(bill.getStatus())
@@ -303,18 +307,114 @@ public class BillService {
                 .build();
     }
 
-    private DiscountResponse mapDiscountToResponse(Discount discount) {
-        return DiscountResponse.builder()
-                .id(discount.getId())
-                .name(discount.getName())
-                .description(discount.getDescription())
-                .discountType(discount.getDiscountType())
-                .valueType(discount.getValueType())
-                .value(discount.getValue())
+    /**
+     * Merge multiple open bills into a brand new bill.
+     * All source bills are marked as MERGED.
+     */
+    @Transactional
+    public BillResponse mergeBills(List<Long> billIds) {
+        log.info("Merging bills {} into a new bill", billIds);
+
+        // ── Guards ────────────────────────────────────────────────────────────
+        if (billIds == null || billIds.size() < 2) {
+            throw new InvalidOperationException("At least two bill IDs are required to merge");
+        }
+        if (billIds.size() != new HashSet<>(billIds).size()) {
+            throw new InvalidOperationException("Duplicate bill IDs found in merge request");
+        }
+
+
+        List<Bill> sourceBills = billIds.stream()
+                .map(id -> {
+                    Bill bill = getBillById(id);
+                    if (bill.getStatus() != BillStatus.OPEN) {
+                        throw new InvalidOperationException(
+                                "Bill " + id + " must be OPEN to be merged — current status: " + bill.getStatus());
+                    }
+                    return bill;
+                })
+                .collect(Collectors.toList());
+
+        // ── Build new bill ────────────────────────────────────────────────────
+        int totalPartySize = sourceBills.stream()
+                .mapToInt(b -> b.getPartySize() != null ? b.getPartySize() : 0)
+                .sum();
+
+        Bill mergedBill = Bill.builder()
+                .totalPrice(BigDecimal.ZERO)
+                .partySize(totalPartySize)
+                .discountAmount(BigDecimal.ZERO)
+                .finalPrice(BigDecimal.ZERO)
+                .status(BillStatus.OPEN)
+                .billTables(new ArrayList<>())
+                .orders(new ArrayList<>())
                 .build();
+
+        Bill savedMergedBill = billRepository.save(mergedBill);
+
+        // ── Absorb orders and tables from each source bill ────────────────────
+        Set<Long> assignedTableIds = new HashSet<>();
+
+        for (Bill source : sourceBills) {
+
+            // Re-parent orders to the new bill
+            source.getOrders().forEach(order -> {
+                order.setBill(savedMergedBill);
+                savedMergedBill.getOrders().add(order);
+            });
+
+            // Re-parent tables, skipping any already linked
+            source.getBillTables().forEach(bt -> {
+                RestaurantTable table = bt.getTable();
+                if (assignedTableIds.add(table.getId())) {
+                    BillTable.BillTableId newId =
+                            new BillTable.BillTableId(savedMergedBill.getId(), table.getId());
+                    BillTable newBt = BillTable.builder()
+                            .id(newId)
+                            .bill(savedMergedBill)
+                            .table(table)
+                            .build();
+                    savedMergedBill.getBillTables().add(newBt);
+                }
+            });
+
+            // Mark source bill as merged
+            source.setStatus(BillStatus.MERGED);
+            source.setClosedAt(LocalDateTime.now());
+            source.getOrders().clear();
+            source.getBillTables().clear();
+            billRepository.save(source);
+
+            log.info("Bill {} marked as MERGED", source.getId());
+        }
+
+        // ── Calculate totals ──────────────────────────────────────────────────
+        BigDecimal mergedTotal = savedMergedBill.getOrders().stream()
+                .flatMap(order -> order.getOrderDetails().stream())
+                .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        savedMergedBill.setTotalPrice(mergedTotal);
+
+        // ── Apply best available discount ─────────────────────────────────────
+        DiscountService.DiscountCalculationResult best =
+                discountService.calculateBillDiscount(savedMergedBill);
+        if (best.getDiscountId() != null) {
+            discountService.applyDiscountToBill(savedMergedBill, best.getDiscountId());
+        }
+
+        savedMergedBill.setFinalPrice(
+                savedMergedBill.getTotalPrice().subtract(savedMergedBill.getDiscountAmount()));
+
+        Bill result = billRepository.save(savedMergedBill);
+
+        log.info("Merge complete — new bill {} created from bills {}. Total: {}",
+                result.getId(), billIds, result.getTotalPrice());
+
+        return mapToResponse(result);
     }
 
-    private OrderResponse mapOrderToResponse(Order order) {
+       private OrderResponse mapOrderToResponse(Order order) {
         BigDecimal totalAmount = order.getOrderDetails().stream()
                 .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

@@ -4,5 +4,6 @@ public enum BillStatus {
     OPEN,
     PAID,
     CLOSED,
-    CANCELLED
+    CANCELLED,
+    MERGED
 }

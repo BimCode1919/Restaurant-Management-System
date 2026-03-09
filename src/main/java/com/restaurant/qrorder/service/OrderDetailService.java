@@ -8,8 +8,12 @@ import com.restaurant.qrorder.repository.OrderDetailRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,10 +33,10 @@ public class OrderDetailService {
         orderDetail.setItemStatus(request);
 
 
+        ItemStatus oldStatus = orderDetail.getItemStatus();
+        orderDetail.setItemStatus(request);
         OrderDetail saved = orderDetailRepository.save(orderDetail);
-        log.info("OrderDetail ID: {} status updated: {} → {}",
-                saved.getId(), orderDetail.getItemStatus(), request);
-
+        log.info("OrderDetail ID: {} status updated: {} → {}", saved.getId(), oldStatus, request);
         return mapToResponse(saved);
     }
 
@@ -47,4 +51,17 @@ public class OrderDetailService {
                 .price(od.getPrice())
                 .build();
     }
+    @Transactional(readOnly = true)
+    public List<OrderDetailResponse> getReadyOrderDetails() {
+        return orderDetailRepository.findReadyOrderDetailsSortedByOrderCreatedAt().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+    @Transactional(readOnly = true)
+    public List<OrderDetailResponse> getPreparingOrderDetails() {
+        return orderDetailRepository.findPreparingOrderDetailsSortedByOrderCreatedAt().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
 }
