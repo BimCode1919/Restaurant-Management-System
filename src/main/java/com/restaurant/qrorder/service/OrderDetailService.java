@@ -52,13 +52,6 @@ public class OrderDetailService {
                 .build();
     }
     @Transactional(readOnly = true)
-    public List<OrderDetailResponse> getAllOrderDetails() {
-        return orderDetailRepository.findPendingOrderDetailsSortedByOrderCreatedAt().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public List<OrderDetailResponse> getReadyOrderDetails() {
         return orderDetailRepository.findReadyOrderDetailsSortedByOrderCreatedAt().stream()
                 .map(this::mapToResponse)
