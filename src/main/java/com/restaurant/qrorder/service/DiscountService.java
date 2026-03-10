@@ -9,6 +9,7 @@ import com.restaurant.qrorder.domain.entity.Bill;
 import com.restaurant.qrorder.domain.entity.Discount;
 import com.restaurant.qrorder.domain.entity.Item;
 import com.restaurant.qrorder.domain.entity.OrderDetail;
+import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.mapper.DiscountMapper;
 import com.restaurant.qrorder.repository.DiscountRepository;
@@ -20,10 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.restaurant.qrorder.domain.common.DiscountType.*;
 import static lombok.AccessLevel.PRIVATE;
 
 @Slf4j
@@ -34,8 +37,7 @@ public class DiscountService {
 
     DiscountRepository discountRepository;
     DiscountMapper discountMapper;
-
-    // ==================== CRUD METHODS ====================
+    DiscountCalculationService discountCalculationService;
 
     @Transactional(readOnly = true)
     public List<DiscountResponse> getAllDiscounts() {
@@ -115,7 +117,11 @@ public class DiscountService {
 
     @Transactional
     public DiscountResponse createDiscount(CreateDiscountRequest request) {
-        log.debug("Creating new discount: {}", request.getName());
+        if (request.getDiscountType() == BILL_TIER &&
+                (request.getTierConfig() == null || request.getTierConfig().isBlank())) {
+            throw new InvalidOperationException("BILL_TIER discount requires a tier configuration");
+        }
+
         Discount savedDiscount = discountRepository.save(discountMapper.toEntity(request));
         log.info("Discount created successfully with id: {}", savedDiscount.getId());
         return discountMapper.toResponse(savedDiscount);
@@ -146,14 +152,17 @@ public class DiscountService {
 
         Discount updatedDiscount = discountRepository.save(discount);
         log.info("Discount updated successfully with id: {}", id);
+
         return discountMapper.toResponse(updatedDiscount);
     }
 
     @Transactional
     public void deleteDiscount(Long id) {
         log.debug("Deleting discount with id: {}", id);
+
         Discount discount = discountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found with id: " + id));
+
         discountRepository.delete(discount);
         log.info("Discount deleted successfully with id: {}", id);
     }
@@ -161,10 +170,13 @@ public class DiscountService {
     @Transactional
     public DiscountResponse toggleDiscountStatus(Long id) {
         log.debug("Toggling discount status with id: {}", id);
+
         Discount discount = discountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found with id: " + id));
+
         discount.setActive(!discount.getActive());
         Discount updatedDiscount = discountRepository.save(discount);
+
         log.info("Discount status toggled to {} for id: {}", updatedDiscount.getActive(), id);
         return discountMapper.toResponse(updatedDiscount);
     }
@@ -172,59 +184,170 @@ public class DiscountService {
     // ==================== DISCOUNT CALCULATION METHODS ====================
 
     /**
-     * Finds applicable discounts, picks the best one, applies it to the bill,
-     * and manages usage counts for both the previous and new discount.
+     * Calculate discount for a bill
+     * @param bill The bill to calculate discount for
+     * @return DiscountCalculationResult with discount details
      */
-    @Transactional
-    public DiscountCalculationResult applyBestDiscountToBill(Bill bill) {
-        log.debug("Applying best discount to bill ID: {}", bill.getId());
+    public DiscountCalculationResult calculateBillDiscount(Bill bill) {
+        log.debug("Calculating discount for bill ID: {}", bill.getId());
 
         List<Discount> applicableDiscounts = getApplicableDiscounts(bill);
 
         if (applicableDiscounts.isEmpty()) {
-            log.info("No applicable discounts found for bill ID: {}", bill.getId());
-            bill.setDiscount(null);
-            bill.setDiscountAmount(BigDecimal.ZERO);
-            bill.setFinalPrice(bill.getTotalPrice());
+            log.debug("No applicable discounts found for bill ID: {}", bill.getId());
             return DiscountCalculationResult.noDiscount();
         }
 
-        // Pick the discount that gives the highest saving — entity already in memory, no extra DB fetch needed
-        Discount bestDiscount = applicableDiscounts.stream()
-                .max(Comparator.comparing(d -> calculateDiscountAmount(d, bill).getDiscountAmount()))
-                .orElseThrow();
-
-        DiscountCalculationResult bestResult = calculateDiscountAmount(bestDiscount, bill);
-
-        // Decrement previous discount usage if it's being replaced
-        if (bill.getDiscount() != null && !bill.getDiscount().getId().equals(bestDiscount.getId())) {
-            Discount previousDiscount = bill.getDiscount();
-            previousDiscount.setUsedCount(Math.max(0, previousDiscount.getUsedCount() - 1));
-            discountRepository.save(previousDiscount);
-            log.info("Decremented usage count for previous discount [{}]", previousDiscount.getId());
-        }
-
-        // Increment usage count only if this discount wasn't already applied to this bill
-        boolean isNewDiscount = bill.getDiscount() == null
-                || !bill.getDiscount().getId().equals(bestDiscount.getId());
-        if (isNewDiscount) {
-            bestDiscount.setUsedCount(bestDiscount.getUsedCount() + 1);
-            discountRepository.save(bestDiscount);
-        }
-
-        bill.setDiscount(bestDiscount);
-        bill.setDiscountAmount(bestResult.getDiscountAmount());
-        bill.setFinalPrice(bill.getTotalPrice().subtract(bestResult.getDiscountAmount()));
-
-        log.info("Applied best discount [{}] to bill [{}]: discountAmount={}, finalPrice={}",
-                bestDiscount.getName(), bill.getId(),
-                bestResult.getDiscountAmount(), bestResult.getFinalAmount());
-
-        return bestResult;
+        return applicableDiscounts.stream()
+                .map(discount -> calculateDiscountAmount(discount, bill))
+                .max(Comparator.comparing(DiscountCalculationResult::getDiscountAmount))
+                .orElse(DiscountCalculationResult.noDiscount());
     }
 
     /**
-     * Apply a specific discount to a bill by ID.
+     * Get all applicable discounts for a bill
+     */
+    private List<Discount> getApplicableDiscounts(Bill bill) {
+        LocalDateTime now = LocalDateTime.now();
+        return discountRepository.findActiveDiscounts(now).stream()
+                .filter(discount -> isDiscountSilentlyApplicable(discount, bill, now))
+                .collect(Collectors.toList());
+    }
+    private boolean isDiscountSilentlyApplicable(Discount discount, Bill bill, LocalDateTime now) {
+        try {
+            discountCalculationService.validateDiscountApplicability(
+                    discount, bill.getTotalPrice(), bill.getPartySize(), now);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
+
+    /**
+     * Check if current day is applicable
+     */
+    private boolean isApplicableDay(String applicableDays, LocalDateTime dateTime) {
+        if (applicableDays == null || applicableDays.isEmpty()) {
+            return true;
+        }
+
+        DayOfWeek currentDay = dateTime.getDayOfWeek();
+        String dayName = currentDay.toString();
+        
+        // applicableDays format: "MONDAY,FRIDAY,SATURDAY"
+        return applicableDays.toUpperCase().contains(dayName);
+    }
+    
+    /**
+     * Calculate discount amount for a specific discount
+     */
+    public DiscountCalculationResult calculateDiscountAmount(Discount discount, Bill bill) {
+        BigDecimal totalPrice = bill.getTotalPrice();
+        BigDecimal discountAmount;
+
+        switch (discount.getDiscountType()) {
+            case ITEM_SPECIFIC:
+                discountAmount = calculateItemSpecificDiscount(discount, bill);
+                break;
+            case HOLIDAY:
+                // Holiday discounts apply a percentage to the whole bill
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+            case PARTY_SIZE:
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+            case BILL_TIER:
+                discountAmount = calculateTierDiscount(discount, totalPrice);
+                break;
+            default:
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+        }
+
+        // Cap at max discount amount if configured
+        if (discount.getMaxDiscountAmount() != null
+                && discountAmount.compareTo(discount.getMaxDiscountAmount()) > 0) {
+            discountAmount = discount.getMaxDiscountAmount();
+        }
+
+        return DiscountCalculationResult.builder()
+                .discountId(discount.getId())
+                .discountName(discount.getName())
+                .discountType(discount.getDiscountType())
+                .discountAmount(discountAmount)
+                .originalAmount(totalPrice)
+                .finalAmount(totalPrice.subtract(discountAmount))
+                .build();
+    }
+
+    /**
+     * Calculate item-specific discount
+     */
+    private BigDecimal calculateItemSpecificDiscount(Discount discount, Bill bill) {
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+
+        Set<Long> discountItemIds = discount.getItems().stream()
+                .map(Item::getId)
+                .collect(Collectors.toSet());
+
+        for (var order : bill.getOrders()) {
+            for (OrderDetail detail : order.getOrderDetails()) {
+                if (discountItemIds.contains(detail.getItem().getId())) {
+                    BigDecimal itemTotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));
+                    
+                    if (discount.getValueType() == DiscountValueType.PERCENTAGE) {
+                        totalDiscount = totalDiscount.add(calculatePercentageDiscount(discount.getValue(), itemTotal));
+                    } else if (discount.getValueType() == DiscountValueType.FIXED_AMOUNT) {
+                        totalDiscount = totalDiscount.add(discount.getValue().multiply(BigDecimal.valueOf(detail.getQuantity())));
+                    }
+                }
+            }
+        }
+
+        return totalDiscount;
+    }
+
+    /**
+     * Calculate percentage discount
+     */
+    private BigDecimal calculatePercentageDiscount(BigDecimal percentage, BigDecimal amount) {
+        return amount.multiply(percentage)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculate tier-based discount
+     */
+    private BigDecimal calculateTierDiscount(Discount discount, BigDecimal totalPrice) {
+        if (discount.getTierConfig() == null || discount.getTierConfig().isEmpty()) {
+            // Fallback to simple percentage
+            return calculatePercentageDiscount(discount.getValue(), totalPrice);
+        }
+
+        // Parse tier config: "500000:5,1000000:10,2000000:15"
+        // Format: "minAmount:discountPercent,..."
+        String[] tiers = discount.getTierConfig().split(",");
+        BigDecimal applicableDiscount = BigDecimal.ZERO;
+
+        for (String tier : tiers) {
+            String[] parts = tier.split(":");
+            if (parts.length == 2) {
+                BigDecimal minAmount = new BigDecimal(parts[0].trim());
+                BigDecimal discountPercent = new BigDecimal(parts[1].trim());
+
+                if (totalPrice.compareTo(minAmount) >= 0) {
+                    applicableDiscount = discountPercent;
+                }
+            }
+        }
+
+        return calculatePercentageDiscount(applicableDiscount, totalPrice);
+    }
+
+    /**
+     * Apply discount to bill
      */
     @Transactional
     public void applyDiscountToBill(Bill bill, Long discountId) {
@@ -273,33 +396,8 @@ public class DiscountService {
     }
 
     /**
-     * Calculate the best discount for a bill without applying it (read-only).
+     * Find best discount for bill
      */
-    public DiscountCalculationResult calculateBillDiscount(Bill bill) {
-        log.debug("Calculating discount for bill ID: {}", bill.getId());
-
-        List<Discount> applicableDiscounts = getApplicableDiscounts(bill);
-
-        if (applicableDiscounts.isEmpty()) {
-            log.debug("No applicable discounts found for bill ID: {}", bill.getId());
-            return DiscountCalculationResult.noDiscount();
-        }
-
-        DiscountCalculationResult best = applicableDiscounts.stream()
-                .map(discount -> calculateDiscountAmount(discount, bill))
-                .max(Comparator.comparing(DiscountCalculationResult::getDiscountAmount))
-                .orElse(DiscountCalculationResult.noDiscount());
-
-        log.info("Best discount for bill ID {}: {} with amount: {}",
-                bill.getId(), best.getDiscountName(), best.getDiscountAmount());
-
-        return best;
-    }
-
-    /**
-     * Find best discount response for a bill without applying it (read-only).
-     */
-    @Transactional(readOnly = true)
     public DiscountResponse findBestDiscount(Bill bill) {
         log.debug("Finding best discount for bill ID: {}", bill.getId());
 
@@ -314,168 +412,11 @@ public class DiscountService {
                 .orElse(null);
     }
 
-    // ==================== PRIVATE HELPERS ====================
-
-    private List<Discount> getApplicableDiscounts(Bill bill) {
-        LocalDateTime now = LocalDateTime.now();
-        return discountRepository.findActiveDiscounts(now).stream()
-                .filter(discount -> isDiscountApplicable(discount, bill, now))
-                .collect(Collectors.toList());
-    }
-
-    private boolean isDiscountApplicable(Discount discount, Bill bill, LocalDateTime now) {
-        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) return false;
-        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) return false;
-        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) return false;
-        if (discount.getMinOrderAmount() != null
-                && bill.getTotalPrice().compareTo(discount.getMinOrderAmount()) < 0) return false;
-        if (discount.getMinPartySize() != null
-                && (bill.getPartySize() == null || bill.getPartySize() < discount.getMinPartySize())) return false;
-        if (discount.getMaxPartySize() != null
-                && (bill.getPartySize() == null || bill.getPartySize() > discount.getMaxPartySize())) return false;
-        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()
-                && !isApplicableDay(discount.getApplicableDays(), now)) return false;
-
-        switch (discount.getDiscountType()) {
-            case ITEM_SPECIFIC:
-                return hasApplicableItems(discount, bill);
-            case PARTY_SIZE:
-                return bill.getPartySize() != null
-                        && bill.getPartySize() >= (discount.getMinPartySize() != null ? discount.getMinPartySize() : 1);
-            case BILL_TIER:
-                return bill.getTotalPrice().compareTo(
-                        discount.getMinOrderAmount() != null ? discount.getMinOrderAmount() : BigDecimal.ZERO) >= 0;
-            case HOLIDAY:
-                // Applicable days already checked above
-                return true;
-            default:
-                return true;
-        }
-    }
+    // ==================== HELPER CLASSES ====================
 
     /**
-     * Fixed: uses Set.contains() instead of String.contains() to avoid partial matches
-     * e.g. "MONDAY" no longer falsely matches "MONDAY_SPECIAL"
+     * Result of discount calculation
      */
-    private boolean isApplicableDay(String applicableDays, LocalDateTime dateTime) {
-        if (applicableDays == null || applicableDays.isEmpty()) {
-            return true;
-        }
-        Set<String> days = Arrays.stream(applicableDays.toUpperCase().split(","))
-                .map(String::trim)
-                .collect(Collectors.toSet());
-        return days.contains(dateTime.getDayOfWeek().toString());
-    }
-
-    private boolean hasApplicableItems(Discount discount, Bill bill) {
-        if (!discount.getApplyToSpecificItems()) {
-            return true;
-        }
-        Set<Long> discountItemIds = discount.getItems().stream()
-                .map(Item::getId)
-                .collect(Collectors.toSet());
-        return bill.getOrders().stream()
-                .flatMap(order -> order.getOrderDetails().stream())
-                .anyMatch(detail -> discountItemIds.contains(detail.getItem().getId()));
-    }
-
-    public DiscountCalculationResult calculateDiscountAmount(Discount discount, Bill bill) {
-        BigDecimal totalPrice = bill.getTotalPrice();
-        BigDecimal discountAmount;
-
-        switch (discount.getDiscountType()) {
-            case ITEM_SPECIFIC:
-                discountAmount = calculateItemSpecificDiscount(discount, bill);
-                break;
-            case HOLIDAY:
-                // Holiday discounts apply a percentage to the whole bill
-                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
-                break;
-            case PARTY_SIZE:
-                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
-                break;
-            case BILL_TIER:
-                discountAmount = calculateTierDiscount(discount, totalPrice);
-                break;
-            default:
-                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
-                break;
-        }
-
-        // Cap at max discount amount if configured
-        if (discount.getMaxDiscountAmount() != null
-                && discountAmount.compareTo(discount.getMaxDiscountAmount()) > 0) {
-            discountAmount = discount.getMaxDiscountAmount();
-        }
-
-        return DiscountCalculationResult.builder()
-                .discountId(discount.getId())
-                .discountName(discount.getName())
-                .discountType(discount.getDiscountType())
-                .discountAmount(discountAmount)
-                .originalAmount(totalPrice)
-                .finalAmount(totalPrice.subtract(discountAmount))
-                .build();
-    }
-
-    private BigDecimal calculateItemSpecificDiscount(Discount discount, Bill bill) {
-        BigDecimal totalDiscount = BigDecimal.ZERO;
-
-        Set<Long> discountItemIds = discount.getItems().stream()
-                .map(Item::getId)
-                .collect(Collectors.toSet());
-
-        for (var order : bill.getOrders()) {
-            for (OrderDetail detail : order.getOrderDetails()) {
-                if (discountItemIds.contains(detail.getItem().getId())) {
-                    BigDecimal itemTotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));
-                    if (discount.getValueType() == DiscountValueType.PERCENTAGE) {
-                        totalDiscount = totalDiscount.add(calculatePercentageDiscount(discount.getValue(), itemTotal));
-                    } else if (discount.getValueType() == DiscountValueType.FIXED_AMOUNT) {
-                        totalDiscount = totalDiscount.add(
-                                discount.getValue().multiply(BigDecimal.valueOf(detail.getQuantity())));
-                    }
-                }
-            }
-        }
-
-        return totalDiscount;
-    }
-
-    private BigDecimal calculatePercentageDiscount(BigDecimal percentage, BigDecimal amount) {
-        return amount.multiply(percentage)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateTierDiscount(Discount discount, BigDecimal totalPrice) {
-        if (discount.getTierConfig() == null || discount.getTierConfig().isEmpty()) {
-            return calculatePercentageDiscount(discount.getValue(), totalPrice);
-        }
-
-
-        String cleanConfig = discount.getTierConfig().replace("\"", "").trim();
-
-        BigDecimal applicablePercent = BigDecimal.ZERO;
-        for (String tier : cleanConfig.split(",")) {
-            String[] parts = tier.split(":");
-            if (parts.length == 2) {
-                try {
-                    BigDecimal minAmount = new BigDecimal(parts[0].trim());
-                    BigDecimal discountPercent = new BigDecimal(parts[1].trim());
-                    if (totalPrice.compareTo(minAmount) >= 0) {
-                        applicablePercent = discountPercent;
-                    }
-                } catch (NumberFormatException e) {
-                    log.warn("Skipping malformed tier entry '{}' for discount [{}]: {}",
-                            tier, discount.getId(), e.getMessage());
-                }
-            }
-        }
-
-        return calculatePercentageDiscount(applicablePercent, totalPrice);
-    }
-    // ==================== HELPER CLASS ====================
-
     @lombok.Data
     @lombok.Builder
     @lombok.NoArgsConstructor
