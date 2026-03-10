@@ -2,6 +2,7 @@ package com.restaurant.qrorder.controller;
 
 import com.restaurant.qrorder.domain.dto.request.CreateOrderRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
+import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
 import com.restaurant.qrorder.domain.dto.response.OrderResponse;
 import com.restaurant.qrorder.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -75,6 +76,20 @@ public class OrderController {
                 ApiResponse.<Void>builder()
                         .statusCode(HttpStatus.OK.value())
                         .message("Order deleted successfully")
+                        .build());
+    }
+
+    @PatchMapping("/MassUpdateStatus/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CHEF')")
+    @Operation(summary = "Mass update item in an order")
+    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> massUpdateOrderDetail(@PathVariable Long id)
+    {
+        List<OrderDetailResponse> orderDetailResponseList = orderService.massUpdateOrderItemStatus(id);
+        return ResponseEntity.ok(
+                ApiResponse.<List<OrderDetailResponse>>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Mass update item status susccessfully")
+                        .data(orderDetailResponseList)
                         .build());
     }
 }
