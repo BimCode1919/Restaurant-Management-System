@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS discounts (
 COMMENT ON COLUMN discounts.value_type IS 'Type of discount value: PERCENTAGE (%), FIXED_AMOUNT (fixed discount), FIXED_PRICE (set item price)';
 COMMENT ON COLUMN discounts.min_party_size IS 'Minimum party size for PARTY_SIZE discount type';
 COMMENT ON COLUMN discounts.max_party_size IS 'Maximum party size for PARTY_SIZE discount type';
-COMMENT ON COLUMN discounts.tier_config IS 'JSON config for BILL_TIER discount: {"tier1":{"min":200000,"discount":10}}';
+COMMENT ON COLUMN discounts.tier_config IS 'Tier config for BILL_TIER discount: "minAmount:discountValue,..." e.g. "200000:5,500000:10"';
 COMMENT ON COLUMN discounts.applicable_days IS 'Applicable days for HOLIDAY discount: "MONDAY,FRIDAY" or "2026-01-01,2026-02-14"';
 COMMENT ON COLUMN discounts.apply_to_specific_items IS 'Flag to indicate if discount applies to specific items only';
 
@@ -253,10 +253,6 @@ CREATE INDEX IF NOT EXISTS idx_discounts_value_type ON discounts(value_type);
 CREATE INDEX IF NOT EXISTS idx_discount_items_discount_id ON discount_items(discount_id);
 CREATE INDEX IF NOT EXISTS idx_discount_items_item_id ON discount_items(item_id);
 
--- Grant privileges (only for production database)
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO restaurant_user;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO restaurant_user;
-
 -- ==========================================
 -- INITIAL DATA
 -- ==========================================
@@ -270,8 +266,7 @@ INSERT INTO roles (id, name) VALUES
 (5, 'CASHIER'),
 (6, 'MANAGER');
 
--- Users (password: admin123, admin123, admin123)
--- Hash generated with BCryptPasswordEncoder for "admin123"
+-- Users (password: admin123)
 INSERT INTO users (id, email, password, full_name, phone, role_id, active, created_at, updated_at) VALUES
 (1, 'admin@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Administrator', '0901234567', 1, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 'staff@restaurant.com', '$2a$12$Ep5HCg28eCw3nqOJPlQytuCHfiwBBKYdGg6uni3X0noBQyNLZF81m', 'Staff Member', '0901234568', 2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -329,30 +324,13 @@ INSERT INTO items (id, category_id, name, description, price, unit, image_url, a
 (15, 5, 'Tom Yum Soup', 'Spicy and sour Tom Yum soup', 70000, NULL, '/images/tom-yum.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (16, 5, 'Chicken Noodle Soup', 'Vietnamese chicken noodle soup (Pho Ga)', 60000, NULL, '/images/pho-ga.jpg', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
-
 -- Recipes (Item-Ingredient relationships)
 INSERT INTO recipes (id, item_id, ingredient_id, quantity, unit) VALUES
--- Spring Rolls
-(1, 1, 1, 0.05, NULL),
-(2, 1, 6, 0.02, NULL),
-(3, 1, 10, 0.05, NULL),
--- Fried Rice with Chicken
-(4, 4, 1, 0.15, NULL),
-(5, 4, 2, 0.1, NULL),
-(6, 4, 6, 0.03, NULL),
-(7, 4, 9, 0.02, NULL),
--- Grilled Beef Steak
-(8, 5, 3, 0.25, NULL),
-(9, 5, 7, 0.01, NULL),
-(10, 5, 18, 0.15, NULL),
--- Shrimp Pasta
-(11, 6, 4, 0.15, NULL),
-(12, 6, 19, 0.1, NULL),
-(13, 6, 14, 0.05, NULL),
--- Vietnamese Coffee
-(14, 8, 13, 0.02, NULL),
-(15, 8, 14, 0.03, NULL),
-(16, 8, 11, 0.01, NULL);
+(1, 1, 1, 0.05, NULL), (2, 1, 6, 0.02, NULL), (3, 1, 10, 0.05, NULL),
+(4, 4, 1, 0.15, NULL), (5, 4, 2, 0.1, NULL), (6, 4, 6, 0.03, NULL), (7, 4, 9, 0.02, NULL),
+(8, 5, 3, 0.25, NULL), (9, 5, 7, 0.01, NULL), (10, 5, 18, 0.15, NULL),
+(11, 6, 4, 0.15, NULL), (12, 6, 19, 0.1, NULL), (13, 6, 14, 0.05, NULL),
+(14, 8, 13, 0.02, NULL), (15, 8, 14, 0.03, NULL), (16, 8, 11, 0.01, NULL);
 
 -- Tables
 INSERT INTO tables (id, table_number, qr_code, capacity, status, location, created_at, updated_at) VALUES
@@ -367,66 +345,61 @@ INSERT INTO tables (id, table_number, qr_code, capacity, status, location, creat
 (9, '09', 'QR_TABLE_09_' || uuid_generate_v4(), 8, 'AVAILABLE', '2nd Floor - Party Room', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (10, '10', 'QR_TABLE_10_' || uuid_generate_v4(), 2, 'AVAILABLE', '2nd Floor - Balcony', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
--- Discounts (discount_type must be: ITEM_SPECIFIC, HOLIDAY, PARTY_SIZE, BILL_TIER)
+-- ==========================================
+-- DISCOUNTS
+-- discount_type: ITEM_SPECIFIC, HOLIDAY, PARTY_SIZE, BILL_TIER
+-- tier_config format (BILL_TIER only): "minAmount:discountPercent,..." e.g. "200000:5,500000:10"
+-- ==========================================
 INSERT INTO discounts (id, code, name, description, discount_type, value_type, value, min_order_amount, max_discount_amount, start_date, end_date, usage_limit, used_count, active, created_at, updated_at) VALUES
-(1, 'WELCOME10', 'Welcome Discount', '10% discount for new customers', 'HOLIDAY', 'PERCENTAGE', 10, 100000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 'FREESHIP', 'Free Shipping', 'Free delivery for orders above 200k', 'BILL_TIER', 'FIXED_AMOUNT', 30000, 200000, 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 200, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, 'LUNCH20', 'Lunch Special', '20% discount during lunch hours (11 AM - 1 PM)', 'HOLIDAY', 'PERCENTAGE', 20, 150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(4, 'HAPPY50K', 'Happy Hour', '50k discount for orders above 300k', 'BILL_TIER', 'FIXED_AMOUNT', 50000, 300000, 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days', 50, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(5, 'SALE20', 'Flash Sale 20%', '20% discount up to 50k for orders above 100k', 'HOLIDAY', 'PERCENTAGE', 20, 100000, 50000, '2026-01-25 00:00:00', '2026-02-28 23:59:59', 100, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(6, 'PIZZA20', 'Pizza Sale 20%', '20% discount for all pizza items', 'ITEM_SPECIFIC', 'PERCENTAGE', 20, NULL, NULL, '2026-01-25 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(7, 'WEEKENDPARTY', 'Weekend Party 25%', '25% discount on Saturdays and Sundays', 'HOLIDAY', 'PERCENTAGE', 25, 200000, 100000, '2026-02-01 00:00:00', '2026-02-28 23:59:59', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(8, 'TET2026', 'Tet Holiday Sale', '30% discount during Lunar New Year holiday', 'HOLIDAY', 'PERCENTAGE', 30, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(9, 'GROUP4', 'Group Discount 4+ People', '10% discount for groups of 4-6 people', 'PARTY_SIZE', 'PERCENTAGE', 10, 200000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(10, 'GROUP7', 'Group Discount 7+ People', '15% discount for groups of 7-10 people', 'PARTY_SIZE', 'PERCENTAGE', 15, 7, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(11, 'BIGTIER', 'Spend More Save More', 'Tiered discount: 5% (200k+), 10% (500k+), 15% (1M+)', 'BILL_TIER', 'PERCENTAGE', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(12, 'FIXEDTIER', 'Fixed Discount Tiers', 'Fixed discount tiers: 20k (200k+), 60k (500k+), 150k (1M+)', 'BILL_TIER', 'FIXED_AMOUNT', 0, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days', NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+-- HOLIDAY discounts (flat value or percentage, no tier_config needed)
+(1,  'WELCOME10',   'Welcome Discount',      '10% off for new customers',                        'HOLIDAY',       'PERCENTAGE',  10,     100000, 50000,  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',  100,  0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3,  'LUNCH20',     'Lunch Special',         '20% off during lunch hours',                       'HOLIDAY',       'PERCENTAGE',  20,     150000, 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5,  'SALE20',      'Flash Sale 20%',        '20% off up to 50k for orders above 100k',          'HOLIDAY',       'PERCENTAGE',  20,     100000, 50000,  '2026-01-25 00:00:00', '2026-02-28 23:59:59',               100,  0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7,  'WEEKENDPARTY','Weekend Party 25%',     '25% off on Saturdays and Sundays',                 'HOLIDAY',       'PERCENTAGE',  25,     200000, 100000, '2026-02-01 00:00:00', '2026-02-28 23:59:59',               NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8,  'TET2026',     'Tet Holiday Sale',      '30% off during Lunar New Year',                    'HOLIDAY',       'PERCENTAGE',  30,     NULL,   NULL,   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
-UPDATE discounts
-SET tier_config     = '200000:5,500000:10,1000000:15',
-    min_order_amount = 200000,   -- must spend at least 200k to qualify
-    max_discount_amount = 200000 -- cap discount at 200k
-WHERE code = 'BIGTIER';
+-- HOLIDAY discounts that are flat fixed-amount (no tier_config needed — use value field)
+(2,  'FREESHIP',    'Free Shipping',         '30k off for orders above 200k',                    'HOLIDAY',       'FIXED_AMOUNT', 30000, 200000, 30000,  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',  200,  0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4,  'HAPPY50K',    'Happy Hour',            '50k off for orders above 300k',                    'HOLIDAY',       'FIXED_AMOUNT', 50000, 300000, 50000,  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 days',  50,   0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- Fix FIXEDTIER: FIXED_AMOUNT tiers need different handling
--- Since your calculateTierDiscount uses percentage math, convert to percentage-equivalent
--- OR simplify to percentage type so it works with existing code
-UPDATE discounts
-SET tier_config      = '200000:5,500000:10,1000000:15',
-    value_type       = 'PERCENTAGE',   -- change to PERCENTAGE so calculateTierDiscount works
-    min_order_amount  = 200000,
-    max_discount_amount = 150000
-WHERE code = 'FIXEDTIER';
+-- ITEM_SPECIFIC
+(6,  'PIZZA20',     'Pizza Sale 20%',        '20% off for specific items',                       'ITEM_SPECIFIC', 'PERCENTAGE',  20,     NULL,   NULL,   '2026-01-25 00:00:00', '2026-02-28 23:59:59',               NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- Fix GROUP10: min_order_amount and max_discount_amount had party size values (7,10) in wrong columns
-UPDATE discounts
-SET min_order_amount  = 200000,  -- minimum spend
-    max_discount_amount = NULL,
-    min_party_size    = 7,
-    max_party_size    = 10
-WHERE code = 'GROUP7';
+-- PARTY_SIZE
+(9,  'GROUP4',      'Group Discount 4-6',    '10% off for groups of 4-6 people',                 'PARTY_SIZE',    'PERCENTAGE',  10,     200000, NULL,   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'GROUP7',      'Group Discount 7-10',   '15% off for groups of 7-10 people',                'PARTY_SIZE',    'PERCENTAGE',  15,     200000, NULL,   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '60 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
--- Update specific discount configurations
-UPDATE discounts SET applicable_days = 'SATURDAY,SUNDAY' WHERE code = 'WEEKENDPARTY';
-UPDATE discounts SET applicable_days = '2026-01-01,2026-02-10,2026-02-11,2026-02-12' WHERE code = 'TET2026';
-UPDATE discounts SET min_party_size = 4, max_party_size = 6 WHERE code = 'GROUP4';
-UPDATE discounts SET min_party_size = 7, max_party_size = 10 WHERE code = 'GROUP7';
-UPDATE discounts SET tier_config = '{"tier1":{"min":200000,"discount":5},"tier2":{"min":500000,"discount":10},"tier3":{"min":1000000,"discount":15}}' WHERE code = 'BIGTIER';
-UPDATE discounts SET tier_config = '{"tier1":{"min":200000,"discount":20000},"tier2":{"min":500000,"discount":60000},"tier3":{"min":1000000,"discount":150000}}' WHERE code = 'FIXEDTIER';
+-- BILL_TIER (tier_config required, format: "minAmount:discountPercent,...")
+(11, 'BIGTIER',     'Spend More Save More',  'Tiered: 5% (200k+), 10% (500k+), 15% (1M+)',      'BILL_TIER',     'PERCENTAGE',  0,      200000, 200000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 'FIXEDTIER',   'Fixed Discount Tiers',  'Tiered: 5% (200k+), 10% (500k+), 15% (1M+)',      'BILL_TIER',     'PERCENTAGE',  0,      200000, 150000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '90 days',  NULL, 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- BILL_TIER tier_config (simple format, no JSON)
+UPDATE discounts SET tier_config = '200000:5,500000:10,1000000:15' WHERE code IN ('BIGTIER', 'FIXEDTIER');
+
+-- HOLIDAY applicable_days
+UPDATE discounts SET applicable_days = 'SATURDAY,SUNDAY'                              WHERE code = 'WEEKENDPARTY';
+UPDATE discounts SET applicable_days = NULL                                            WHERE code = 'TET2026'; -- date range already limits this
+UPDATE discounts SET applicable_days = NULL                                            WHERE code = 'TET2026';
+
+-- PARTY_SIZE config
+UPDATE discounts SET min_party_size = 4, max_party_size = 6   WHERE code = 'GROUP4';
+UPDATE discounts SET min_party_size = 7, max_party_size = 10  WHERE code = 'GROUP7';
+
+-- ITEM_SPECIFIC flag
 UPDATE discounts SET apply_to_specific_items = true WHERE code = 'PIZZA20';
 
--- Reset sequences to proper values
-SELECT setval('roles_id_seq', (SELECT MAX(id) FROM roles));
-SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
-SELECT setval('categories_id_seq', (SELECT MAX(id) FROM categories));
+-- Reset sequences
+SELECT setval('roles_id_seq',       (SELECT MAX(id) FROM roles));
+SELECT setval('users_id_seq',       (SELECT MAX(id) FROM users));
+SELECT setval('categories_id_seq',  (SELECT MAX(id) FROM categories));
 SELECT setval('ingredients_id_seq', (SELECT MAX(id) FROM ingredients));
-SELECT setval('items_id_seq', (SELECT MAX(id) FROM items));
-SELECT setval('recipes_id_seq', (SELECT MAX(id) FROM recipes));
-SELECT setval('tables_id_seq', (SELECT MAX(id) FROM tables));
-SELECT setval('discounts_id_seq', (SELECT MAX(id) FROM discounts));
+SELECT setval('items_id_seq',       (SELECT MAX(id) FROM items));
+SELECT setval('recipes_id_seq',     (SELECT MAX(id) FROM recipes));
+SELECT setval('tables_id_seq',      (SELECT MAX(id) FROM tables));
+SELECT setval('discounts_id_seq',   (SELECT MAX(id) FROM discounts));
 
 -- ==========================================
--- Comments for better documentation
+-- Comments
 -- ==========================================
 COMMENT ON TABLE reservations IS 'Customer table reservations';
 COMMENT ON TABLE payments IS 'Payment transactions for bills';
