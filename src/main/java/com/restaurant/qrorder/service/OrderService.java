@@ -185,7 +185,7 @@ public class OrderService {
             if (orderDetail.getItemStatus() == ItemStatus.CANCELLED) {
                 continue;
             }
-            orderDetail.setItemStatus(ItemStatus.READY);
+            orderDetail.setItemStatus(ItemStatus.PREPARING);
          orderDetailResponseList.add(mapOrderDetailToResponse(orderDetailRepository.save(orderDetail)));
             log.info("Successfully updated order detail with id:", orderDetail.getId());
         }
