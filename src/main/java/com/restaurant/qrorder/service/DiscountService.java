@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.restaurant.qrorder.domain.common.DiscountType.*;
 import static lombok.AccessLevel.PRIVATE;
 
 @Slf4j
@@ -72,16 +73,43 @@ public class DiscountService {
 
     @Transactional(readOnly = true)
     public DiscountResponse validateDiscountCode(String code, Double orderAmount, Integer partySize) {
-        log.debug("Validating discount code: {}", code);
+        log.debug("Validating discount code: {} for order amount: {}, party size: {}", code, orderAmount, partySize);
+
         Discount discount = discountRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid discount code: " + code));
 
-        discountCalculationService.validateDiscountApplicability(
-                discount,
-                orderAmount != null ? BigDecimal.valueOf(orderAmount) : BigDecimal.ZERO,
-                partySize,
-                LocalDateTime.now()
-        );
+        LocalDateTime now = LocalDateTime.now();
+
+        if (!discount.getActive()) {
+            throw new IllegalStateException("Discount code is not active");
+        }
+        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
+            throw new IllegalStateException("Discount is not yet valid");
+        }
+        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
+            throw new IllegalStateException("Discount has expired");
+        }
+        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) {
+            throw new IllegalStateException("Discount usage limit reached");
+        }
+        if (orderAmount != null && discount.getMinOrderAmount() != null) {
+            if (BigDecimal.valueOf(orderAmount).compareTo(discount.getMinOrderAmount()) < 0) {
+                throw new IllegalStateException("Order amount does not meet minimum requirement of " + discount.getMinOrderAmount());
+            }
+        }
+        if (partySize != null) {
+            if (discount.getMinPartySize() != null && partySize < discount.getMinPartySize()) {
+                throw new IllegalStateException("Party size does not meet minimum requirement of " + discount.getMinPartySize());
+            }
+            if (discount.getMaxPartySize() != null && partySize > discount.getMaxPartySize()) {
+                throw new IllegalStateException("Party size exceeds maximum limit of " + discount.getMaxPartySize());
+            }
+        }
+        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()) {
+            if (!isApplicableDay(discount.getApplicableDays(), now)) {
+                throw new IllegalStateException("Discount is not applicable on " + now.getDayOfWeek());
+            }
+        }
 
         log.info("Discount code {} validated successfully", code);
         return discountMapper.toResponse(discount);
@@ -89,7 +117,7 @@ public class DiscountService {
 
     @Transactional
     public DiscountResponse createDiscount(CreateDiscountRequest request) {
-        if (request.getDiscountType() == DiscountType.BILL_TIER &&
+        if (request.getDiscountType() == BILL_TIER &&
                 (request.getTierConfig() == null || request.getTierConfig().isBlank())) {
             throw new InvalidOperationException("BILL_TIER discount requires a tier configuration");
         }
@@ -106,66 +134,21 @@ public class DiscountService {
         Discount discount = discountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found with id: " + id));
 
-        if (request.getName() != null) {
-            discount.setName(request.getName());
-        }
-
-        if (request.getDescription() != null) {
-            discount.setDescription(request.getDescription());
-        }
-
-        if (request.getDiscountType() != null) {
-            discount.setDiscountType(request.getDiscountType());
-        }
-
-        if (request.getValue() != null) {
-            discount.setValue(request.getValue());
-        }
-
-        if (request.getMinOrderAmount() != null) {
-            discount.setMinOrderAmount(request.getMinOrderAmount());
-        }
-
-        if (request.getMaxDiscountAmount() != null) {
-            discount.setMaxDiscountAmount(request.getMaxDiscountAmount());
-        }
-
-        if (request.getStartDate() != null) {
-            discount.setStartDate(request.getStartDate());
-        }
-
-        if (request.getEndDate() != null) {
-            discount.setEndDate(request.getEndDate());
-        }
-
-        if (request.getUsageLimit() != null) {
-            discount.setUsageLimit(request.getUsageLimit());
-        }
-
-        // Update advanced fields
-        if (request.getMinPartySize() != null) {
-            discount.setMinPartySize(request.getMinPartySize());
-        }
-
-        if (request.getMaxPartySize() != null) {
-            discount.setMaxPartySize(request.getMaxPartySize());
-        }
-
-        if (request.getTierConfig() != null) {
-            discount.setTierConfig(request.getTierConfig());
-        }
-
-        if (request.getApplicableDays() != null) {
-            discount.setApplicableDays(request.getApplicableDays());
-        }
-
-        if (request.getApplyToSpecificItems() != null) {
-            discount.setApplyToSpecificItems(request.getApplyToSpecificItems());
-        }
-
-        if (request.getActive() != null) {
-            discount.setActive(request.getActive());
-        }
+        if (request.getName() != null) discount.setName(request.getName());
+        if (request.getDescription() != null) discount.setDescription(request.getDescription());
+        if (request.getDiscountType() != null) discount.setDiscountType(request.getDiscountType());
+        if (request.getValue() != null) discount.setValue(request.getValue());
+        if (request.getMinOrderAmount() != null) discount.setMinOrderAmount(request.getMinOrderAmount());
+        if (request.getMaxDiscountAmount() != null) discount.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        if (request.getStartDate() != null) discount.setStartDate(request.getStartDate());
+        if (request.getEndDate() != null) discount.setEndDate(request.getEndDate());
+        if (request.getUsageLimit() != null) discount.setUsageLimit(request.getUsageLimit());
+        if (request.getMinPartySize() != null) discount.setMinPartySize(request.getMinPartySize());
+        if (request.getMaxPartySize() != null) discount.setMaxPartySize(request.getMaxPartySize());
+        if (request.getTierConfig() != null) discount.setTierConfig(request.getTierConfig());
+        if (request.getApplicableDays() != null) discount.setApplicableDays(request.getApplicableDays());
+        if (request.getApplyToSpecificItems() != null) discount.setApplyToSpecificItems(request.getApplyToSpecificItems());
+        if (request.getActive() != null) discount.setActive(request.getActive());
 
         Discount updatedDiscount = discountRepository.save(discount);
         log.info("Discount updated successfully with id: {}", id);
@@ -240,62 +223,7 @@ public class DiscountService {
         }
     }
 
-    /**
-     * Check if discount is applicable to the bill
-     */
-    private boolean isDiscountApplicable(Discount discount, Bill bill, LocalDateTime now) {
-        // Check date range
-        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
-            return false;
-        }
-        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
-            return false;
-        }
 
-        // Check usage limit
-        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) {
-            return false;
-        }
-
-        // Check minimum order amount
-        if (discount.getMinOrderAmount() != null && 
-            bill.getTotalPrice().compareTo(discount.getMinOrderAmount()) < 0) {
-            return false;
-        }
-
-        // Check party size
-        if (discount.getMinPartySize() != null && 
-            (bill.getPartySize() == null || bill.getPartySize() < discount.getMinPartySize())) {
-            return false;
-        }
-        if (discount.getMaxPartySize() != null && 
-            (bill.getPartySize() == null || bill.getPartySize() > discount.getMaxPartySize())) {
-            return false;
-        }
-
-        // Check applicable days
-        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()) {
-            if (!isApplicableDay(discount.getApplicableDays(), now)) {
-                return false;
-            }
-        }
-
-        // Type-specific checks
-        switch (discount.getDiscountType()) {
-            case ITEM_SPECIFIC:
-                return hasApplicableItems(discount, bill);
-            case HOLIDAY:
-                return isApplicableDay(discount.getApplicableDays(), now);
-            case PARTY_SIZE:
-                return bill.getPartySize() != null && 
-                       bill.getPartySize() >= (discount.getMinPartySize() != null ? discount.getMinPartySize() : 1);
-            case BILL_TIER:
-                return bill.getTotalPrice().compareTo(discount.getMinOrderAmount() != null ? 
-                       discount.getMinOrderAmount() : BigDecimal.ZERO) >= 0;
-            default:
-                return true;
-        }
-    }
 
     /**
      * Check if current day is applicable
@@ -311,36 +239,38 @@ public class DiscountService {
         // applicableDays format: "MONDAY,FRIDAY,SATURDAY"
         return applicableDays.toUpperCase().contains(dayName);
     }
-
-    /**
-     * Check if bill has items eligible for item-specific discount
-     */
-    private boolean hasApplicableItems(Discount discount, Bill bill) {
-        if (!discount.getApplyToSpecificItems()) {
-            return true;
-        }
-
-        Set<Long> discountItemIds = discount.getItems().stream()
-                .map(Item::getId)
-                .collect(Collectors.toSet());
-
-        return bill.getOrders().stream()
-                .flatMap(order -> order.getOrderDetails().stream())
-                .anyMatch(detail -> discountItemIds.contains(detail.getItem().getId()));
-    }
-
+    
     /**
      * Calculate discount amount for a specific discount
      */
     public DiscountCalculationResult calculateDiscountAmount(Discount discount, Bill bill) {
-        BigDecimal discountAmount = discountCalculationService.calculateDiscountAmount(
-                discount,
-                bill.getTotalPrice(),
-                bill.getPartySize(),
-                LocalDateTime.now()
-        );
-
         BigDecimal totalPrice = bill.getTotalPrice();
+        BigDecimal discountAmount;
+
+        switch (discount.getDiscountType()) {
+            case ITEM_SPECIFIC:
+                discountAmount = calculateItemSpecificDiscount(discount, bill);
+                break;
+            case HOLIDAY:
+                // Holiday discounts apply a percentage to the whole bill
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+            case PARTY_SIZE:
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+            case BILL_TIER:
+                discountAmount = calculateTierDiscount(discount, totalPrice);
+                break;
+            default:
+                discountAmount = calculatePercentageDiscount(discount.getValue(), totalPrice);
+                break;
+        }
+
+        // Cap at max discount amount if configured
+        if (discount.getMaxDiscountAmount() != null
+                && discountAmount.compareTo(discount.getMaxDiscountAmount()) > 0) {
+            discountAmount = discount.getMaxDiscountAmount();
+        }
 
         return DiscountCalculationResult.builder()
                 .discountId(discount.getId())
@@ -426,6 +356,30 @@ public class DiscountService {
 
         if (!discount.getActive()) {
             throw new IllegalStateException("Discount is not active");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (discount.getStartDate() != null && now.isBefore(discount.getStartDate())) {
+            throw new IllegalStateException("Discount is not yet valid");
+        }
+        if (discount.getEndDate() != null && now.isAfter(discount.getEndDate())) {
+            throw new IllegalStateException("Discount has expired");
+        }
+        if (discount.getUsageLimit() != null && discount.getUsedCount() >= discount.getUsageLimit()) {
+            throw new IllegalStateException("Discount usage limit reached");
+        }
+        if (discount.getMinOrderAmount() != null
+                && bill.getTotalPrice().compareTo(discount.getMinOrderAmount()) < 0) {
+            throw new IllegalStateException("Order amount does not meet minimum requirement");
+        }
+        if (discount.getMinPartySize() != null
+                && (bill.getPartySize() == null || bill.getPartySize() < discount.getMinPartySize())) {
+            throw new IllegalStateException("Party size does not meet minimum requirement");
+        }
+        if (discount.getApplicableDays() != null && !discount.getApplicableDays().isEmpty()
+                && !isApplicableDay(discount.getApplicableDays(), now)) {
+            throw new IllegalStateException("Discount is not applicable today");
         }
 
         DiscountCalculationResult result = calculateDiscountAmount(discount, bill);
