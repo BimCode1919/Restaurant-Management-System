@@ -4,13 +4,19 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.common.ItemStatus;
 import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
 import com.restaurant.qrorder.domain.entity.OrderDetail;
+import com.restaurant.qrorder.exception.custom.InvalidOperationException;
+import com.restaurant.qrorder.mapper.ItemMapper;
 import com.restaurant.qrorder.repository.OrderDetailRepository;
+import com.restaurant.qrorder.util.OrderDetailSpecification;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,7 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderDetailService {
     private final OrderDetailRepository orderDetailRepository;
-
+    private  Specification<OrderDetail> specification;
     @Transactional
     public OrderDetailResponse updateItemStatus(Long orderDetailId, ItemStatus request) {
 
@@ -50,17 +56,15 @@ public class OrderDetailService {
                 .price(od.getPrice())
                 .build();
     }
+
     @Transactional(readOnly = true)
-    public List<OrderDetailResponse> getReadyOrderDetails() {
-        return orderDetailRepository.findReadyOrderDetailsSortedByOrderCreatedAt().stream()
+    public List<OrderDetailResponse> getOrderDetailsByStatus(ItemStatus status) {
+              specification = new OrderDetailSpecification().getItemByStatus(status);
+        return orderDetailRepository.findAll(specification).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
-    @Transactional(readOnly = true)
-    public List<OrderDetailResponse> getPreparingOrderDetails() {
-        return orderDetailRepository.findPreparingOrderDetailsSortedByOrderCreatedAt().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
+
+
 
 }
