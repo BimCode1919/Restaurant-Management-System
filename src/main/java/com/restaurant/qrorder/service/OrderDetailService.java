@@ -3,11 +3,9 @@ package com.restaurant.qrorder.service;
 
 import com.restaurant.qrorder.domain.common.ItemStatus;
 import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
-import com.restaurant.qrorder.domain.entity.Ingredient;
-import com.restaurant.qrorder.domain.entity.Item;
-import com.restaurant.qrorder.domain.entity.OrderDetail;
-import com.restaurant.qrorder.domain.entity.Recipe;
+import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.repository.IngredientRepository;
+import com.restaurant.qrorder.repository.IngredientUsageRepository;
 import com.restaurant.qrorder.repository.OrderDetailRepository;
 import com.restaurant.qrorder.repository.RecipeRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -28,6 +26,7 @@ public class OrderDetailService {
     private final OrderDetailRepository orderDetailRepository;
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
+    private final IngredientUsageRepository ingredientUsageRepository;
 
     @Transactional
     public OrderDetailResponse updateItemStatus(Long orderDetailId, ItemStatus request) {
@@ -63,27 +62,31 @@ public class OrderDetailService {
             return;
         }
 
-        for (Recipe recipe : recipes) {
-            Ingredient ingredient = recipe.getIngredient();
+            for (Recipe recipe : recipes) {
+                Ingredient ingredient = recipe.getIngredient();
 
-            // Amount to deduct = recipe quantity per dish × number of dishes ordered
-            BigDecimal toDeduct = recipe.getQuantity()
-                    .multiply(BigDecimal.valueOf(quantity));
+                BigDecimal quantityNeeded = recipe.getQuantity()
+                        .multiply(BigDecimal.valueOf(quantity));
 
-            if (ingredient.getStockQuantity().compareTo(toDeduct) < 0) {
-                log.warn("Low stock for ingredient '{}': need {} but only {} available",
-                        ingredient.getName(), toDeduct, ingredient.getStockQuantity());
-                // ✅ Deduct whatever is left — don't throw, kitchen already made the dish
-                toDeduct = ingredient.getStockQuantity();
+                boolean wasLowStock = false;
+
+                // ✅ Check if low stock
+                if (ingredient.getStockQuantity().compareTo(quantityNeeded) < 0) {
+                    log.warn("Low stock for '{}': need {} but only {} available",
+                            ingredient.getName(), quantityNeeded, ingredient.getStockQuantity());
+                    quantityNeeded = ingredient.getStockQuantity(); // deduct whatever is left
+                    wasLowStock  = true;
+                }
+
+                // ✅ Deduct from ingredient stock
+                ingredient.setStockQuantity(
+                        ingredient.getStockQuantity().subtract(quantityNeeded));
+                ingredientRepository.save(ingredient);
+
+                log.info("IngredientUsage saved — ingredient: '{}', used: {}/{} {}, lowStock: {}",
+                        ingredient.getName(), quantityNeeded, quantityNeeded,
+                        recipe.getUnit(), wasLowStock);
             }
-
-            ingredient.setStockQuantity(ingredient.getStockQuantity().subtract(toDeduct));
-            ingredientRepository.save(ingredient);
-
-            log.info("Deducted {} {} of '{}' — remaining: {}",
-                    toDeduct, ingredient.getUnit(),
-                    ingredient.getName(), ingredient.getStockQuantity());
-        }
     }
 
     private OrderDetailResponse mapToResponse(OrderDetail od) {

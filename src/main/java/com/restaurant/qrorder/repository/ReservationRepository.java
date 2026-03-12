@@ -52,11 +52,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         SELECT r FROM Reservation r
         JOIN FETCH r.tables t
         WHERE r.status = 'PENDING'
-        AND r.reservationTime BETWEEN :now AND :oneHourLater
+        AND r.reservationTime BETWEEN :now AND :twoHourLater
         AND t.status = 'AVAILABLE'
     """)
     List<Reservation> findReservationsToReserveTable(
             @Param("now") LocalDateTime now,
-            @Param("oneHourLater") LocalDateTime oneHourLater
+            @Param("twoHourLater") LocalDateTime twoHourLater
     );
 }

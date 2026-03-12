@@ -8,6 +8,7 @@ import com.restaurant.qrorder.domain.dto.request.OrderDetailRequest;
 import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
 import com.restaurant.qrorder.domain.dto.response.OrderResponse;
 import com.restaurant.qrorder.domain.entity.*;
+import com.restaurant.qrorder.exception.custom.InsufficientIngredientException;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
 import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.*;
@@ -35,6 +36,8 @@ public class OrderService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final OrderDetailRepository orderDetailRepository;
+    private final RecipeRepository recipeRepository;
+    private final IngredientRepository ingredientRepository;
 
     /**
      * Create new order
@@ -49,6 +52,8 @@ public class OrderService {
         if (bill.getStatus() != com.restaurant.qrorder.domain.common.BillStatus.OPEN) {
             throw new InvalidOperationException("Cannot add order to a non-open bill");
         }
+
+        validateIngredientsAvailability(request.getItems());
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -226,5 +231,53 @@ public class OrderService {
                 .itemStatus(detail.getItemStatus())
                 .notes(detail.getNote())
                 .build();
+    }
+
+    private void validateIngredientsAvailability(List<OrderDetailRequest> items) {
+
+        // Collect ALL failures first — don't stop at the first one
+        List<String> insufficientIngredients = new ArrayList<>();
+
+        for (OrderDetailRequest itemRequest : items) {
+            Item item = itemRepository.findById(itemRequest.getItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Item not found: " + itemRequest.getItemId()));
+
+            List<Recipe> recipes = recipeRepository.findByItemId(item.getId());
+
+            if (recipes.isEmpty()) {
+                log.warn("No recipe for item '{}' — skipping ingredient check", item.getName());
+                continue;
+            }
+
+            for (Recipe recipe : recipes) {
+                Ingredient ingredient = recipe.getIngredient();
+
+                BigDecimal needed = recipe.getQuantity()
+                        .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+
+                if (ingredient.getStockQuantity().compareTo(needed) < 0) {
+                    // ✅ Collect specific failure message per item + ingredient
+                    insufficientIngredients.add(String.format(
+                            "Item '%s' (qty: %d) needs %.2f %s of '%s' but only %.2f %s available",
+                            item.getName(),
+                            itemRequest.getQuantity(),
+                            needed,
+                            recipe.getUnit(),
+                            ingredient.getName(),
+                            ingredient.getStockQuantity(),
+                            ingredient.getUnit()
+                    ));
+                }
+            }
+        }
+
+        // ✅ Throw ONE error listing ALL missing ingredients at once
+        if (!insufficientIngredients.isEmpty()) {
+            throw new InsufficientIngredientException(
+                    "Cannot create order — insufficient ingredients:\n"
+                            + String.join("\n", insufficientIngredients)
+            );
+        }
     }
 }

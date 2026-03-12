@@ -397,6 +397,38 @@ public class ReservationService {
                 .orElseThrow(() -> new RuntimeException("Reservation not found with ID: " + id));
     }
 
+    @Scheduled(cron = "0 */5 * * * *")
+    @Transactional
+    public void autoReserveTablesBeforeReservation() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime twoHourLater = now.plusHours(2);
+
+        List<Reservation> upcomingReservations = reservationRepository
+                .findReservationsToReserveTable(now, twoHourLater);
+
+        if (upcomingReservations.isEmpty()) {
+            return;
+        }
+
+        for (Reservation reservation : upcomingReservations) {
+            List<RestaurantTable> tablesToReserve = reservation.getTables().stream()
+                    .filter(t -> t.getStatus() == TableStatus.AVAILABLE)
+                    .toList();
+
+            if (!tablesToReserve.isEmpty()) {
+                tablesToReserve.forEach(table -> table.setStatus(TableStatus.RESERVED));
+                tableRepository.saveAll(tablesToReserve);
+
+                log.info("Auto-reserved {} table(s) for reservation ID: {} (starts at {})",
+                        tablesToReserve.size(),
+                        reservation.getId(),
+                        reservation.getReservationTime());
+            }
+        }
+
+        log.info("Auto-reserve job processed {} upcoming reservations", upcomingReservations.size());
+    }
+
     private void validateReservationTime(LocalDateTime reservationTime) {
         if (reservationTime.isBefore(LocalDateTime.now().plusHours(1))) {
             throw new RuntimeException("Reservation must be at least 1 hour in advance");
