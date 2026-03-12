@@ -1,10 +1,8 @@
 package com.restaurant.qrorder.exception.handler;
 
+import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.ErrorResponse;
-import com.restaurant.qrorder.exception.custom.AuthenticationException;
-import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
-import com.restaurant.qrorder.exception.custom.InvalidOperationException;
-import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
+import com.restaurant.qrorder.exception.custom.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -31,6 +30,18 @@ public class GlobalExceptionHandler {
                         .statusCode(HttpStatus.NOT_FOUND.value())
                         .error("Not Found")
                         .message(ex.getMessage())
+                        .build());
+    }
+
+    @ExceptionHandler(InsufficientIngredientException.class)
+    public ResponseEntity<ApiResponse<List<String>>> handleInsufficientIngredient(
+            InsufficientIngredientException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.<List<String>>builder()
+                        .statusCode(422)
+                        .message("Insufficient ingredients to fulfill this order")
+                        .data(ex.getDetails()) // ✅ returns each item's shortage as a list
                         .build());
     }
 
