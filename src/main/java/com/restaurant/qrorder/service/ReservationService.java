@@ -30,6 +30,7 @@ public class ReservationService {
     private final RestaurantTableRepository tableRepository;
     private final UserRepository userRepository;
     private final BillRepository billRepository;
+    private final ReservationMailService reservationMailService;
 
     /**
      * Tạo reservation mới
@@ -257,7 +258,11 @@ public class ReservationService {
 
         log.info("Confirmed reservation ID: {}", reservationId);
 
-        return mapToResponse(saved);
+        ReservationResponse response = mapToResponse(saved);
+
+        reservationMailService.sendReservationConfirmedMail(response);
+
+        return response;
     }
 
     /**
@@ -310,7 +315,11 @@ public class ReservationService {
 
         log.info("Cancelled reservation ID: {}, Reason: {}", reservationId, reason);
 
-        return mapToResponse(saved);
+        ReservationResponse response = mapToResponse(saved);
+
+        reservationMailService.sendReservationCancelledMail(response);
+
+        return response;
     }
 
     /**
@@ -334,8 +343,11 @@ public class ReservationService {
         Reservation saved = reservationRepository.save(reservation);
 
         log.warn("Marked reservation ID: {} as NO_SHOW", reservationId);
+        ReservationResponse response = mapToResponse(saved);
 
-        return mapToResponse(saved);
+        reservationMailService.sendReservationNoShowMail(response);
+
+        return response;
     }
 
     /**

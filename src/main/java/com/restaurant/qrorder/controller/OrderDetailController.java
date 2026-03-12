@@ -42,28 +42,18 @@ public class OrderDetailController {
                         .build());
     }
 
-    @GetMapping("/ready")
+    @GetMapping("/statusList")
     @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
-    @Operation(summary = "Get a list of order details with status READY, excluding SERVED")
-    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getReadyOrders() {
-        List<OrderDetailResponse> responses = orderDetailService.getReadyOrderDetails();
+    @Operation(summary = "get items by status", description = "Return a list of items with matching status")
+    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getItemByStatus(@Valid @RequestParam  ItemStatus status)
+    {
+        List<OrderDetailResponse> list = orderDetailService.getOrderDetailsByStatus(status);
         return ResponseEntity.ok(
-                ApiResponse.<List<OrderDetailResponse>>builder()
-                        .statusCode(HttpStatus.OK.value())
-                        .message("Fetched READY order details successfully")
-                        .data(responses)
-                        .build());
-    }
-    @GetMapping("/preparing")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF', 'STAFF')")
-    @Operation(summary = "Get a list of order details with status READY, excluding SERVED")
-    public ResponseEntity<ApiResponse<List<OrderDetailResponse>>> getPreparingOrders() {
-        List<OrderDetailResponse> responses = orderDetailService.getPreparingOrderDetails();
-        return ResponseEntity.ok(
-                ApiResponse.<List<OrderDetailResponse>>builder()
-                        .statusCode(HttpStatus.OK.value())
-                        .message("Fetched Preparing order details successfully")
-                        .data(responses)
-                        .build());
+                ApiResponse
+                        .<List<OrderDetailResponse>>builder()
+                .statusCode(HttpStatus.OK.value())
+                .message("Fetched List of item with status: "+status)
+                .data(list)
+                .build());
     }
 }

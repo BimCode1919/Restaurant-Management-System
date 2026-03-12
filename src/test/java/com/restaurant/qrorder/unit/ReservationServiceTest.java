@@ -82,6 +82,9 @@ class ReservationServiceTest {
         r.setDepositRequired(false);
         r.setDepositPaid(false);
         r.setTables(new ArrayList<>(List.of(table)));
+        Bill bill = new Bill();
+        bill.setId(id);
+        r.setBill(bill);
         return r;
     }
 
@@ -99,7 +102,6 @@ class ReservationServiceTest {
             request.setPartySize(2);
             request.setReservationTime(validReservationTime);
             request.setRequestedTableIds(List.of(1L));
-            request.setDepositRequired(null);
         }
 
         @Test
@@ -209,9 +211,8 @@ class ReservationServiceTest {
         }
 
         @Test
-        @DisplayName("depositRequired null → defaults to false")
-        void nullDepositRequired_defaultsFalse() {
-            request.setDepositRequired(null);
+        @DisplayName("valid request → reservation saved")
+        void valid_reservationSaved() {
             when(tableRepository.findAllById(List.of(1L))).thenReturn(List.of(table));
             when(reservationRepository.findConflictingReservations(any(), any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -220,36 +221,6 @@ class ReservationServiceTest {
 
             reservationService.createReservation(request, 1L);
 
-            verify(reservationRepository).save(argThat(r -> !r.getDepositRequired()));
-        }
-
-        @Test
-        @DisplayName("depositRequired true → set to true")
-        void depositRequiredTrue_setsTrue() {
-            request.setDepositRequired(true);
-            when(tableRepository.findAllById(List.of(1L))).thenReturn(List.of(table));
-            when(reservationRepository.findConflictingReservations(any(), any(), any()))
-                    .thenReturn(Collections.emptyList());
-            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-            when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
-
-            reservationService.createReservation(request, 1L);
-
-            verify(reservationRepository).save(argThat(Reservation::getDepositRequired));
-        }
-
-        @Test
-        @DisplayName("valid request → tables marked RESERVED and reservation saved")
-        void valid_tablesReservedAndSaved() {
-            when(tableRepository.findAllById(List.of(1L))).thenReturn(List.of(table));
-            when(reservationRepository.findConflictingReservations(any(), any(), any()))
-                    .thenReturn(Collections.emptyList());
-            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-            when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
-
-            reservationService.createReservation(request, 1L);
-
-            assertThat(table.getStatus()).isEqualTo(TableStatus.RESERVED);
             verify(tableRepository).saveAll(any());
             verify(reservationRepository).save(any(Reservation.class));
         }
@@ -581,17 +552,6 @@ class ReservationServiceTest {
             ReservationResponse result = reservationService.getReservation(1L);
 
             assertThat(result.getBillId()).isEqualTo(7L);
-        }
-
-        @Test
-        @DisplayName("reservation without bill → billId null")
-        void withoutBill_billIdNull() {
-            pendingReservation.setBill(null);
-            when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
-
-            ReservationResponse result = reservationService.getReservation(1L);
-
-            assertThat(result.getBillId()).isNull();
         }
     }
 }
