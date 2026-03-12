@@ -84,6 +84,14 @@ public class OrderDetailService {
                     wasLowStock  = true;
                 }
 
+                IngredientUsage usage = IngredientUsage.builder()
+                        .orderDetail(orderDetail)
+                        .ingredient(ingredient)  // ✅ direct link
+                        .quantityUsed(quantityNeeded)
+                        .unit(ingredient.getUnit())
+                        .build();
+                ingredientUsageRepository.save(usage);
+
                 // ✅ Deduct from ingredient stock
                 ingredient.setStockQuantity(
                         ingredient.getStockQuantity().subtract(quantityNeeded));
