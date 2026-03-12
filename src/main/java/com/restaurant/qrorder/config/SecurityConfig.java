@@ -54,7 +54,8 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**",
                                 "/error",
-                                "/guest-session/**")
+                                "/guest-session/**",
+                                "/ai/**")
                         .permitAll()
                         // All other API endpoints require authentication (handled by @PreAuthorize in controllers)
                         .anyRequest().authenticated()
