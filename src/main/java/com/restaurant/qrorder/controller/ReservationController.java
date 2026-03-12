@@ -87,6 +87,15 @@ public class ReservationController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/reserve-tables")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Auto update table status to reserved before on hour to reservation",
+            description = "Retrieve reservation details (Admin/Staff only)")
+    public ResponseEntity<String> triggerReserveTables() {
+        reservationService.autoReserveTablesBeforeReservation();
+        return ResponseEntity.ok("Auto-reserve tables job triggered successfully");
+    }
+
     /**
      * List reservations by date range
      */

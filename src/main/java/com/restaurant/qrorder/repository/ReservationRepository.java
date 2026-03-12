@@ -47,4 +47,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    @Query("""
+        SELECT r FROM Reservation r
+        JOIN FETCH r.tables t
+        WHERE r.status = 'PENDING'
+        AND r.reservationTime BETWEEN :now AND :oneHourLater
+        AND t.status = 'AVAILABLE'
+    """)
+    List<Reservation> findReservationsToReserveTable(
+            @Param("now") LocalDateTime now,
+            @Param("oneHourLater") LocalDateTime oneHourLater
+    );
 }

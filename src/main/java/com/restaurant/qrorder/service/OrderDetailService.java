@@ -3,14 +3,20 @@ package com.restaurant.qrorder.service;
 
 import com.restaurant.qrorder.domain.common.ItemStatus;
 import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
+import com.restaurant.qrorder.domain.entity.Ingredient;
+import com.restaurant.qrorder.domain.entity.Item;
 import com.restaurant.qrorder.domain.entity.OrderDetail;
+import com.restaurant.qrorder.domain.entity.Recipe;
+import com.restaurant.qrorder.repository.IngredientRepository;
 import com.restaurant.qrorder.repository.OrderDetailRepository;
+import com.restaurant.qrorder.repository.RecipeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,7 +24,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class OrderDetailService {
+
     private final OrderDetailRepository orderDetailRepository;
+    private final RecipeRepository recipeRepository;
+    private final IngredientRepository ingredientRepository;
 
     @Transactional
     public OrderDetailResponse updateItemStatus(Long orderDetailId, ItemStatus request) {
@@ -31,12 +40,50 @@ public class OrderDetailService {
 
         orderDetail.setItemStatus(request);
 
+        if (request == ItemStatus.READY) {
+            deductIngredients(orderDetail);
+        }
 
         OrderDetail saved = orderDetailRepository.save(orderDetail);
         log.info("OrderDetail ID: {} status updated: {} → {}",
                 saved.getId(), orderDetail.getItemStatus(), request);
 
         return mapToResponse(saved);
+    }
+
+        private void deductIngredients(OrderDetail orderDetail) {
+        Item item = orderDetail.getItem();
+        int quantity = orderDetail.getQuantity();
+
+        // Get all recipes for this item
+        List<Recipe> recipes = recipeRepository.findByItemId(item.getId());
+
+        if (recipes.isEmpty()) {
+            log.warn("No recipe found for item ID: {} — skipping ingredient deduction", item.getId());
+            return;
+        }
+
+        for (Recipe recipe : recipes) {
+            Ingredient ingredient = recipe.getIngredient();
+
+            // Amount to deduct = recipe quantity per dish × number of dishes ordered
+            BigDecimal toDeduct = recipe.getQuantity()
+                    .multiply(BigDecimal.valueOf(quantity));
+
+            if (ingredient.getStockQuantity().compareTo(toDeduct) < 0) {
+                log.warn("Low stock for ingredient '{}': need {} but only {} available",
+                        ingredient.getName(), toDeduct, ingredient.getStockQuantity());
+                // ✅ Deduct whatever is left — don't throw, kitchen already made the dish
+                toDeduct = ingredient.getStockQuantity();
+            }
+
+            ingredient.setStockQuantity(ingredient.getStockQuantity().subtract(toDeduct));
+            ingredientRepository.save(ingredient);
+
+            log.info("Deducted {} {} of '{}' — remaining: {}",
+                    toDeduct, ingredient.getUnit(),
+                    ingredient.getName(), ingredient.getStockQuantity());
+        }
     }
 
     private OrderDetailResponse mapToResponse(OrderDetail od) {
