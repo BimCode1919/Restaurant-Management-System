@@ -12,4 +12,6 @@ import java.util.List;
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long>, JpaSpecificationExecutor {
 
     List<OrderDetail> findAll(Specification orderDetailSpecification);
+
+
 }

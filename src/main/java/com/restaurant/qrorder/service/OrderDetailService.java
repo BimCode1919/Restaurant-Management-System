@@ -31,7 +31,7 @@ public class OrderDetailService {
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
     private final IngredientUsageRepository ingredientUsageRepository;
-    private final Specification<OrderDetail> specification;
+    private Specification<OrderDetail> specification;
 
 
     @Transactional
@@ -105,18 +105,6 @@ public class OrderDetailService {
                 .notes(od.getNote())
                 .price(od.getPrice())
                 .build();
-    }
-    @Transactional(readOnly = true)
-    public List<OrderDetailResponse> getReadyOrderDetails() {
-        return orderDetailRepository.findReadyOrderDetailsSortedByOrderCreatedAt().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-    @Transactional(readOnly = true)
-    public List<OrderDetailResponse> getPreparingOrderDetails() {
-        return orderDetailRepository.findPreparingOrderDetailsSortedByOrderCreatedAt().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

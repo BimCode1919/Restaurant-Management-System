@@ -1,6 +1,6 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/restaurant_qr_db
-    username: restaurant_user
-    password: restaurant_pass
+    username: postgres
+    password: 123456
     driver-class-name: org.postgresql.Driver
