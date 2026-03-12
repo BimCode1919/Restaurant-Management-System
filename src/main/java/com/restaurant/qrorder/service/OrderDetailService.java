@@ -45,7 +45,7 @@ public class OrderDetailService {
 
         orderDetail.setItemStatus(request);
 
-        if (request == ItemStatus.READY) {
+        if (request == ItemStatus.READY && orderDetail.getItemStatus() != ItemStatus.READY) {
             deductIngredients(orderDetail);
         }
 
