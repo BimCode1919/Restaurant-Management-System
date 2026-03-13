@@ -1,6 +1,8 @@
 package com.restaurant.qrorder.controller;
 
+import com.restaurant.qrorder.domain.common.PaymentMethod;
 import com.restaurant.qrorder.domain.dto.request.CreatePaymentRequest;
+import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.PaymentResponse;
 import com.restaurant.qrorder.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -173,5 +175,51 @@ public class PaymentController {
         //     .build();
         
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reservations/{reservationId}/deposit")
+    @Operation(summary = "Pay reservation deposit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER')")
+    public ResponseEntity<PaymentResponse> payReservationDeposit(
+            @PathVariable Long reservationId,
+            @RequestParam PaymentMethod request) {
+
+        PaymentResponse response = paymentService.createReservationDepositPayment(reservationId, request);
+//        return ResponseEntity.status(HttpStatus.CREATED).body(
+//                ApiResponse.<PaymentResponse>builder()
+//                        .statusCode(201)
+//                        .message("Deposit payment created successfully")
+//                        .data(response)
+//                        .build());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+    }
+
+    @PostMapping("/{paymentId}/confirm-deposit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @Operation(summary = "Manually confirm deposit payment and confirm reservation")
+    public ResponseEntity<ApiResponse<PaymentResponse>> confirmDeposit(
+            @PathVariable Long paymentId) {
+
+        PaymentResponse response = paymentService.confirmDepositPayment(paymentId);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .statusCode(200)
+                .message("Deposit confirmed — reservation is now CONFIRMED")
+                .data(response)
+                .build());
+    }
+
+    @GetMapping("/reservations/{reservationId}/deposit/status")
+    @Operation(summary = "Check deposit payment status and auto-confirm reservation")
+    public ResponseEntity<ApiResponse<PaymentResponse>> checkDepositStatus(
+            @PathVariable Long reservationId) {
+
+        PaymentResponse response = paymentService.checkAndConfirmDeposit(reservationId);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .statusCode(200)
+                .message("Deposit status checked")
+                .data(response)
+                .build());
     }
 }

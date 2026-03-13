@@ -1,13 +1,12 @@
 package com.restaurant.qrorder.service;
 
-import com.restaurant.qrorder.domain.common.BillStatus;
-import com.restaurant.qrorder.domain.common.ReservationStatus;
-import com.restaurant.qrorder.domain.common.TableStatus;
+import com.restaurant.qrorder.domain.common.*;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequestWithoutDeposit;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
+import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +31,9 @@ public class ReservationService {
     private final UserRepository userRepository;
     private final BillRepository billRepository;
     private final ReservationMailService reservationMailService;
+    private final ItemRepository itemRepository;
+    private final PaymentService paymentService;
+    private final OrderRepository orderRepository;
 
     /**
      * Tạo reservation mới
@@ -60,7 +63,7 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
                 .depositRequired(false)
-                .depositAmount(request.getDepositAmount())
+                .depositAmount(BigDecimal.ZERO)
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
@@ -99,14 +102,44 @@ public class ReservationService {
             );
         }
 
-        if (request.getDepositAmount() == null || request.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidOperationException("Deposit amount is required and must be greater than 0");
-        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        record ResolvedPreOrderItem(Item item, int quantity) {}
+        List<ResolvedPreOrderItem> resolvedItems = new ArrayList<>();
 
+        //---------------------PreOrder amount
+        BigDecimal preOrderTotal = BigDecimal.ZERO;
+
+        if (hasPreOrder) {
+            for (CreateReservationRequest.PreOrderItemRequest preItem : request.getPreOrderItems()) {
+                Item item = itemRepository.findById(preItem.getItemId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Item not found: " + preItem.getItemId()));
+
+                if (!item.getAvailable()) {
+                    throw new InvalidOperationException(
+                            "Item '" + item.getName() + "' is not available");
+                }
+
+                resolvedItems.add(new ResolvedPreOrderItem(item, preItem.getQuantity()));
+
+                preOrderTotal = preOrderTotal.add(
+                        item.getPrice().multiply(BigDecimal.valueOf(preItem.getQuantity()))
+                );
+            }
+        }
+
+        //Table fee
+        BigDecimal tableFee = BigDecimal.valueOf(300_000L)
+                .multiply(BigDecimal.valueOf(tables.size()));
+
+        // ─── Step 3: deposit = (preOrderTotal + tableFee) × 10% ──────────────────
+        BigDecimal depositBase   = preOrderTotal.add(tableFee);
+        BigDecimal depositAmount = depositBase
+                .multiply(new BigDecimal("0.10"))
+                .setScale(0, RoundingMode.HALF_UP);
 
         // Create reservation
         Reservation reservation = Reservation.builder()
@@ -118,7 +151,7 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
                 .depositRequired(true)
-                .depositAmount(request.getDepositAmount())
+                .depositAmount(depositAmount)
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
@@ -129,8 +162,11 @@ public class ReservationService {
         tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
         Reservation savedReservation = reservationRepository.save(reservation);
 
+
+
         Bill bill = Bill.builder()
-                .totalPrice(request.getDepositAmount())
+                .totalPrice(preOrderTotal)
+                .finalPrice(BigDecimal.ZERO)
                 .partySize(request.getPartySize())
                 .discountAmount(BigDecimal.ZERO)
                 .finalPrice(BigDecimal.ZERO)
@@ -142,9 +178,41 @@ public class ReservationService {
 
 
         Bill savedBill = billRepository.save(bill);
-        savedReservation.setBill(savedBill);
-        savedReservation = reservationRepository.save(reservation);
 
+        savedReservation.setBill(savedBill);
+        savedReservation = reservationRepository.save(savedReservation);
+
+
+        if (!resolvedItems.isEmpty()) {
+            Order preOrder = Order.builder()
+                    .bill(savedBill)
+                    .orderType(OrderType.PRE_ORDER)    // ✅ mark as pre-order type
+                    .createdBy(user)
+                    .orderDetails(new ArrayList<>())
+                    .build();
+
+            Order savedOrder = orderRepository.save(preOrder);
+
+            for (ResolvedPreOrderItem resolvedItem : resolvedItems) {
+                OrderDetail detail = OrderDetail.builder()
+                        .order(savedOrder)
+                        .item(resolvedItem.item())
+                        .quantity(resolvedItem.quantity())
+                        .price(resolvedItem.item().getPrice())
+                        .itemStatus(ItemStatus.PENDING)   // ✅ pending until reservation confirmed
+                        .note("Pre-order for reservation #" + savedReservation.getId())
+                        .build();
+
+                savedOrder.getOrderDetails().add(detail);
+            }
+
+            orderRepository.save(savedOrder); // ✅ cascades OrderDetails
+            savedBill.getOrders().add(savedOrder);
+            billRepository.save(savedBill);
+
+            log.info("Pre-order [ID:{}] created with {} item(s) for reservation [ID:{}]",
+                    savedOrder.getId(), resolvedItems.size(), savedReservation.getId());
+        }
 
         // Create bill-table associations and update table status
         for (RestaurantTable table : tables) {
@@ -153,15 +221,16 @@ public class ReservationService {
                     .bill(savedBill)
                     .table(table)
                     .build();
-            table.setStatus(TableStatus.RESERVED);
+//            table.setStatus(TableStatus.RESERVED);
             savedBill.getBillTables().add(billTable);
         }
+
+
         tableRepository.saveAll(tables);
         billRepository.save(savedBill);
 
-        log.info("Created reservation WITH deposit [ID: {}] for customer: {}, partySize: {}, deposit: {}",
-                savedReservation.getId(), savedReservation.getCustomerName(),
-                request.getPartySize(), request.getDepositAmount());
+        log.info("Reservation [ID:{}] — preOrder: {}, tableFee: {}, deposit(10%): {}",
+                savedReservation.getId(), preOrderTotal, tableFee, depositAmount);
 
         return mapToResponse(savedReservation);
     }
@@ -229,7 +298,7 @@ public class ReservationService {
                     .bill(savedBill)
                     .table(table)
                     .build();
-            table.setStatus(TableStatus.RESERVED);
+//            table.setStatus(TableStatus.RESERVED);
             savedBill.getBillTables().add(billTable);
         }
         tableRepository.saveAll(tables);
@@ -284,6 +353,17 @@ public class ReservationService {
         );
 
         Reservation saved = reservationRepository.save(reservation);
+
+        if (Boolean.TRUE.equals(reservation.getDepositRequired())
+                && Boolean.TRUE.equals(reservation.getDepositPaid())) {
+            try {
+                paymentService.refundDepositOnSeated(reservationId);
+                log.info("Deposit auto-refunded on check-in for reservation ID: {}", reservationId);
+            } catch (Exception e) {
+                // Don't block check-in if refund fails — log and handle manually
+                log.error("Deposit refund failed for reservation ID: {} — {}", reservationId, e.getMessage());
+            }
+        }
 
         log.info("Checked in reservation ID: {}, Bill ID: {}", reservationId, billId);
 
