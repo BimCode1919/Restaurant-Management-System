@@ -165,11 +165,10 @@ public class ReservationService {
 
 
         Bill bill = Bill.builder()
-                .totalPrice(preOrderTotal)
-                .finalPrice(BigDecimal.ZERO)
+                .totalPrice(depositAmount)
+                .finalPrice(preOrderTotal)
                 .partySize(request.getPartySize())
                 .discountAmount(BigDecimal.ZERO)
-                .finalPrice(BigDecimal.ZERO)
                 .status(BillStatus.OPEN)
                 .billTables(new ArrayList<>())
                 .orders(new ArrayList<>())
@@ -338,7 +337,7 @@ public class ReservationService {
      * Check-in: Customer arrived and seated
      */
     @Transactional
-    public ReservationResponse checkIn(Long reservationId, Long billId) {
+    public ReservationResponse checkIn(Long reservationId) {
         Reservation reservation = getReservationById(reservationId);
 
         if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
@@ -354,18 +353,8 @@ public class ReservationService {
 
         Reservation saved = reservationRepository.save(reservation);
 
-        if (Boolean.TRUE.equals(reservation.getDepositRequired())
-                && Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            try {
-                paymentService.refundDepositOnSeated(reservationId);
-                log.info("Deposit auto-refunded on check-in for reservation ID: {}", reservationId);
-            } catch (Exception e) {
-                // Don't block check-in if refund fails — log and handle manually
-                log.error("Deposit refund failed for reservation ID: {} — {}", reservationId, e.getMessage());
-            }
-        }
 
-        log.info("Checked in reservation ID: {}, Bill ID: {}", reservationId, billId);
+        log.info("Checked in reservation ID: {}, Bill ID: {}", reservationId);
 
         return mapToResponse(saved);
     }

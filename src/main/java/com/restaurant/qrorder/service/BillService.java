@@ -272,6 +272,12 @@ public class BillService {
         }
 
         // Calculate final price
+
+        if(bill.getReservation() != null) {
+            BigDecimal totalAmountAfterDeposit = bill.getTotalPrice().subtract(bill.getReservation().getDepositAmount());
+            bill.setTotalPrice(totalAmountAfterDeposit);
+        }
+
         bill.setFinalPrice(bill.getTotalPrice().subtract(bill.getDiscountAmount()));
 
         Bill savedBill = billRepository.save(bill);
