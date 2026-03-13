@@ -2,10 +2,7 @@ package com.restaurant.qrorder.domain.entity;
 
 import com.restaurant.qrorder.domain.common.BillStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -15,7 +12,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "bills")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
