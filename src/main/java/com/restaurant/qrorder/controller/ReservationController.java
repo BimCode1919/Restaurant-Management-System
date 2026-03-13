@@ -141,10 +141,9 @@ public class ReservationController {
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     @Operation(summary = "Check-in reservation", description = "Mark customer as arrived and seated (Admin/Staff only)")
     public ResponseEntity<ReservationResponse> checkIn(
-            @PathVariable Long id,
-            @RequestParam Long billId) {
+            @PathVariable Long id) {
         
-        ReservationResponse response = reservationService.checkIn(id, billId);
+        ReservationResponse response = reservationService.checkIn(id);
         return ResponseEntity.ok(response);
     }
 

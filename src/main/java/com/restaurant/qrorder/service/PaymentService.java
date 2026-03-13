@@ -96,6 +96,11 @@ public class PaymentService {
         if (reservation.getStatus() == ReservationStatus.COMPLETED) {
             throw new InvalidOperationException("Reservation is already completed");
         }
+
+        if (reservation.getStatus() == ReservationStatus.SEATED) {
+            throw new InvalidOperationException("Reservation is seated");
+        }
+
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
             throw new InvalidOperationException("Deposit already paid for this reservation");
         }
