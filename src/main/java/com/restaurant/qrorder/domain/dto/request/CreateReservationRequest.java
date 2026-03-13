@@ -38,8 +38,6 @@ public class CreateReservationRequest {
 
     private String note;
 
-    @NotNull
-    private BigDecimal depositAmount;
 
     // Requested table IDs (optional)
     @NotEmpty(message = "Table need to not be fill ín !!!!")
