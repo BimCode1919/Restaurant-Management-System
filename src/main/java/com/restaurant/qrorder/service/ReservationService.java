@@ -163,10 +163,16 @@ public class ReservationService {
         Reservation savedReservation = reservationRepository.save(reservation);
 
 
+        BigDecimal finalPrice = preOrderTotal.subtract(depositAmount);
+        BigDecimal limit = new BigDecimal("0");
+
+        if (finalPrice.compareTo(limit) <= 0) {
+            finalPrice = BigDecimal.ZERO;
+        }
 
         Bill bill = Bill.builder()
-                .totalPrice(depositAmount)
-                .finalPrice(preOrderTotal)
+                .totalPrice(finalPrice)
+                .finalPrice(finalPrice)
                 .partySize(request.getPartySize())
                 .discountAmount(BigDecimal.ZERO)
                 .status(BillStatus.OPEN)
