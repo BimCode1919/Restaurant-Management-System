@@ -178,7 +178,7 @@ public class PaymentService {
                 requestId,
                 amount,
                 "Deposit for Reservation #" + reservation.getId(),
-                ""
+                "http://localhost:3000/payment-callback"
         );
 
         if (!momoResult.isSuccess()) {

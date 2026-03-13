@@ -180,19 +180,19 @@ public class PaymentController {
     @PostMapping("/reservations/{reservationId}/deposit")
     @Operation(summary = "Pay reservation deposit")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER')")
-    public ResponseEntity<PaymentResponse> payReservationDeposit(
+    public ResponseEntity<ApiResponse<PaymentResponse>> payReservationDeposit(
             @PathVariable Long reservationId,
             @RequestParam PaymentMethod request) {
 
         PaymentResponse response = paymentService.createReservationDepositPayment(reservationId, request);
-//        return ResponseEntity.status(HttpStatus.CREATED).body(
-//                ApiResponse.<PaymentResponse>builder()
-//                        .statusCode(201)
-//                        .message("Deposit payment created successfully")
-//                        .data(response)
-//                        .build());
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<PaymentResponse>builder()
+                        .statusCode(201)
+                        .message("Deposit payment created successfully")
+                        .data(response)
+                        .build());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+     //  return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
     }
 

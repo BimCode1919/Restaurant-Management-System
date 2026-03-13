@@ -15,6 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@ToString(exclude = {"reservation","payment","orders","billTables"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Bill {
