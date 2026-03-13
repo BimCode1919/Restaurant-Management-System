@@ -443,6 +443,7 @@ public class PaymentService {
                 reservation.setDepositPaid(true);
                 if (reservation.getStatus() == ReservationStatus.PENDING) {
                     reservation.setStatus(ReservationStatus.CONFIRMED);
+                    reservation.setDepositPaid(true);
                 }
                 reservationRepository.save(reservation);
 

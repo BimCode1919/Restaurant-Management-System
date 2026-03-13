@@ -275,6 +275,11 @@ public class BillService {
 
         if(bill.getReservation() != null) {
             BigDecimal totalAmountAfterDeposit = bill.getTotalPrice().subtract(bill.getReservation().getDepositAmount());
+            BigDecimal limit = new BigDecimal("0");
+            if (totalAmountAfterDeposit.compareTo(limit) <= 0) {
+                totalAmountAfterDeposit = BigDecimal.ZERO;
+            }
+
             bill.setTotalPrice(totalAmountAfterDeposit);
         }
 
