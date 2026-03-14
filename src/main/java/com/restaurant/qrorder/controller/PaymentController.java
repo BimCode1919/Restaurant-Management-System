@@ -222,4 +222,17 @@ public class PaymentController {
                 .data(response)
                 .build());
     }
+
+    @PostMapping("/momo/confirm-order")
+    @Operation(summary = "Confirm MoMo order status manually from frontend")
+    public ResponseEntity<ApiResponse<PaymentResponse>> confirmMomoOrder(@RequestParam String orderId) {
+        // Gọi service và nhận về đối tượng response thay vì void
+        PaymentResponse response = paymentService.handleMoMoCallback(orderId, null, "0", "Manual confirmation");
+
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .statusCode(200)
+                .message("Payment status synchronized")
+                .data(response)
+                .build());
+    }
 }

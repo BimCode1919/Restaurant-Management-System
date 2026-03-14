@@ -11,6 +11,7 @@ import com.restaurant.qrorder.repository.ReservationRepository;
 import com.restaurant.qrorder.repository.RestaurantTableRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,9 @@ public class PaymentService {
     private final MoMoPaymentService moMoPaymentService;
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+
+    @Value("${MOMO_NOTIFY_URL}")
+    private String notifyUrl;
 
     /**
      * Create payment for a bill
@@ -178,8 +182,8 @@ public class PaymentService {
                 requestId,
                 amount,
                 "Deposit for Reservation #" + reservation.getId(),
-                "http://localhost:3000/payment-callback"
-        );
+                "http://localhost:3000/payment-callback",
+                this.notifyUrl);
 
         if (!momoResult.isSuccess()) {
             throw new InvalidOperationException("MoMo payment failed: " + momoResult.getMessage());
@@ -340,7 +344,8 @@ public class PaymentService {
                 requestId,
                 amount,
                 "Payment for Bill #" + bill.getId(),
-                request.getReturnUrl()
+                request.getReturnUrl(),
+                this.notifyUrl
         );
 
         if (!momoResult.isSuccess()) {
@@ -362,7 +367,7 @@ public class PaymentService {
      * Handle MoMo payment callback/IPN
      */
     @Transactional
-    public void handleMoMoCallback(String orderId, String transId, String resultCode, String message) {
+    public PaymentResponse handleMoMoCallback(String orderId, String transId, String resultCode, String message) {
         Payment payment = paymentRepository.findByMomoOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Payment not found for order: " + orderId));
 
@@ -405,7 +410,8 @@ public class PaymentService {
                     orderId, resultCode, message);
         }
 
-        paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+        return mapToResponse(savedPayment);
     }
 
 
@@ -464,9 +470,6 @@ public class PaymentService {
                 && !Boolean.TRUE.equals(reservation.getDepositPaid())) {
 
             reservation.setDepositPaid(true);
-            if (reservation.getStatus() == ReservationStatus.PENDING) {
-                reservation.setStatus(ReservationStatus.CONFIRMED);
-            }
             reservationRepository.save(reservation);
         }
 
