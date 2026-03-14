@@ -158,7 +158,6 @@ public class PaymentService {
         billRepository.save(bill);
 
         return Payment.builder()
-                .bill(bill)
                 .method(PaymentMethod.CASH)
                 .amount(amount)
                 .status(PaymentStatus.COMPLETED)
@@ -186,7 +185,6 @@ public class PaymentService {
         }
 
         return Payment.builder()
-                .bill(bill)
                 .method(PaymentMethod.MOMO)
                 .amount(amount)
                 .status(PaymentStatus.PENDING)

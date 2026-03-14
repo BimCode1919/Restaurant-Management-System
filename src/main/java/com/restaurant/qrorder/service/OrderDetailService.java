@@ -45,7 +45,7 @@ public class OrderDetailService {
 
         orderDetail.setItemStatus(request);
 
-        if (request == ItemStatus.READY && orderDetail.getItemStatus() != ItemStatus.READY) {
+        if (request == ItemStatus.SERVED && orderDetail.getItemStatus() != ItemStatus.SERVED) {
             deductIngredients(orderDetail);
         }
 
@@ -56,7 +56,7 @@ public class OrderDetailService {
         return mapToResponse(saved);
     }
 
-        private void deductIngredients(OrderDetail orderDetail) {
+    private void deductIngredients(OrderDetail orderDetail) {
         Item item = orderDetail.getItem();
         int quantity = orderDetail.getQuantity();
 
