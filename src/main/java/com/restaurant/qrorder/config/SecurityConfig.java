@@ -55,7 +55,8 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/error",
                                 "/guest-session/**",
-                                "/ai/**")
+                                "/ai/**",
+                                "/payments/momo/ipn")
                         .permitAll()
                         // All other API endpoints require authentication (handled by @PreAuthorize in controllers)
                         .anyRequest().authenticated()

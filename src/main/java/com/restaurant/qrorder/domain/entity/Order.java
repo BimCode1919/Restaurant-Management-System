@@ -1,5 +1,6 @@
 package com.restaurant.qrorder.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.restaurant.qrorder.domain.common.OrderStatus;
 import com.restaurant.qrorder.domain.common.OrderType;
 import jakarta.persistence.*;
@@ -27,6 +28,7 @@ public class Order {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bill_id", nullable = false)
+    @JsonIgnore
     private Bill bill;
 
     @ManyToOne(fetch = FetchType.LAZY)

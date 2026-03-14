@@ -61,7 +61,7 @@ public class MoMoPaymentService {
             String requestId,
             BigDecimal amount,
             String orderInfo,
-            String returnUrl) {
+            String returnUrl, String notifyUrl) {
 
         try {
             String requestType = "captureWallet";

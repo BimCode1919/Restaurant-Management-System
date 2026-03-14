@@ -180,19 +180,19 @@ public class PaymentController {
     @PostMapping("/reservations/{reservationId}/deposit")
     @Operation(summary = "Pay reservation deposit")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER')")
-    public ResponseEntity<PaymentResponse> payReservationDeposit(
+    public ResponseEntity<ApiResponse<PaymentResponse>> payReservationDeposit(
             @PathVariable Long reservationId,
             @RequestParam PaymentMethod request) {
 
         PaymentResponse response = paymentService.createReservationDepositPayment(reservationId, request);
-//        return ResponseEntity.status(HttpStatus.CREATED).body(
-//                ApiResponse.<PaymentResponse>builder()
-//                        .statusCode(201)
-//                        .message("Deposit payment created successfully")
-//                        .data(response)
-//                        .build());
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<PaymentResponse>builder()
+                        .statusCode(201)
+                        .message("Deposit payment created successfully")
+                        .data(response)
+                        .build());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+     //  return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
     }
 
@@ -219,6 +219,19 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .statusCode(200)
                 .message("Deposit status checked")
+                .data(response)
+                .build());
+    }
+
+    @PostMapping("/momo/confirm-order")
+    @Operation(summary = "Confirm MoMo order status manually from frontend")
+    public ResponseEntity<ApiResponse<PaymentResponse>> confirmMomoOrder(@RequestParam String orderId) {
+        // Gọi service và nhận về đối tượng response thay vì void
+        PaymentResponse response = paymentService.handleMoMoCallback(orderId, null, "0", "Manual confirmation");
+
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .statusCode(200)
+                .message("Payment status synchronized")
                 .data(response)
                 .build());
     }
