@@ -23,7 +23,7 @@ public class IngredientUsage {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "batch_id", nullable = false)
+    @JoinColumn(name = "batch_id", nullable = true)
     private IngredientBatch batch;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -32,6 +32,13 @@ public class IngredientUsage {
 
     @Column(nullable = false)
     private BigDecimal quantityUsed;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
+
+    @Column(length = 50, name = "unit")
+    private String unit;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

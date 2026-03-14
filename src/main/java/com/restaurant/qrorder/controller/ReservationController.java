@@ -87,6 +87,15 @@ public class ReservationController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/reserve-tables")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Auto update table status to reserved before on hour to reservation",
+            description = "Retrieve reservation details (Admin/Staff only)")
+    public ResponseEntity<String> triggerReserveTables() {
+        reservationService.autoReserveTablesBeforeReservation();
+        return ResponseEntity.ok("Auto-reserve tables job triggered successfully");
+    }
+
     /**
      * List reservations by date range
      */
@@ -132,10 +141,9 @@ public class ReservationController {
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     @Operation(summary = "Check-in reservation", description = "Mark customer as arrived and seated (Admin/Staff only)")
     public ResponseEntity<ReservationResponse> checkIn(
-            @PathVariable Long id,
-            @RequestParam Long billId) {
+            @PathVariable Long id) {
         
-        ReservationResponse response = reservationService.checkIn(id, billId);
+        ReservationResponse response = reservationService.checkIn(id);
         return ResponseEntity.ok(response);
     }
 

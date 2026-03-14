@@ -1,6 +1,6 @@
 spring:
-  profiles:
-    active: local
+#  profiles:
+#    active: local
   application:
     name: restaurant-qr-order
 
@@ -18,7 +18,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -38,6 +38,18 @@ spring:
       enabled: true
       max-file-size: 10MB
       max-request-size: 10MB
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: tidodeemo@gmail.com
+    password: dlat unkw fnyz nzls
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080
@@ -84,4 +96,3 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-

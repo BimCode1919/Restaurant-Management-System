@@ -1,7 +1,9 @@
 package com.restaurant.qrorder.repository;
 
 import com.restaurant.qrorder.domain.entity.Category;
+import com.restaurant.qrorder.domain.entity.Item;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;

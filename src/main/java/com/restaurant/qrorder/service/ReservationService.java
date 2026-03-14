@@ -1,13 +1,12 @@
 package com.restaurant.qrorder.service;
 
-import com.restaurant.qrorder.domain.common.BillStatus;
-import com.restaurant.qrorder.domain.common.ReservationStatus;
-import com.restaurant.qrorder.domain.common.TableStatus;
+import com.restaurant.qrorder.domain.common.*;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequestWithoutDeposit;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
+import com.restaurant.qrorder.exception.custom.ResourceNotFoundException;
 import com.restaurant.qrorder.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +30,10 @@ public class ReservationService {
     private final RestaurantTableRepository tableRepository;
     private final UserRepository userRepository;
     private final BillRepository billRepository;
+    private final ReservationMailService reservationMailService;
+    private final ItemRepository itemRepository;
+    private final PaymentService paymentService;
+    private final OrderRepository orderRepository;
 
     /**
      * Tạo reservation mới
@@ -59,7 +63,7 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
                 .depositRequired(false)
-                .depositAmount(request.getDepositAmount())
+                .depositAmount(BigDecimal.ZERO)
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
@@ -98,14 +102,44 @@ public class ReservationService {
             );
         }
 
-        if (request.getDepositAmount() == null || request.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidOperationException("Deposit amount is required and must be greater than 0");
-        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        record ResolvedPreOrderItem(Item item, int quantity) {}
+        List<ResolvedPreOrderItem> resolvedItems = new ArrayList<>();
 
+        //---------------------PreOrder amount
+        BigDecimal preOrderTotal = BigDecimal.ZERO;
+
+        if (hasPreOrder) {
+            for (CreateReservationRequest.PreOrderItemRequest preItem : request.getPreOrderItems()) {
+                Item item = itemRepository.findById(preItem.getItemId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Item not found: " + preItem.getItemId()));
+
+                if (!item.getAvailable()) {
+                    throw new InvalidOperationException(
+                            "Item '" + item.getName() + "' is not available");
+                }
+
+                resolvedItems.add(new ResolvedPreOrderItem(item, preItem.getQuantity()));
+
+                preOrderTotal = preOrderTotal.add(
+                        item.getPrice().multiply(BigDecimal.valueOf(preItem.getQuantity()))
+                );
+            }
+        }
+
+        //Table fee
+        BigDecimal tableFee = BigDecimal.valueOf(300_000L)
+                .multiply(BigDecimal.valueOf(tables.size()));
+
+        // ─── Step 3: deposit = (preOrderTotal + tableFee) × 10% ──────────────────
+        BigDecimal depositBase   = preOrderTotal.add(tableFee);
+        BigDecimal depositAmount = depositBase
+                .multiply(new BigDecimal("0.10"))
+                .setScale(0, RoundingMode.HALF_UP);
 
         // Create reservation
         Reservation reservation = Reservation.builder()
@@ -117,7 +151,7 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
                 .depositRequired(true)
-                .depositAmount(request.getDepositAmount())
+                .depositAmount(depositAmount)
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
@@ -128,11 +162,19 @@ public class ReservationService {
         tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
         Reservation savedReservation = reservationRepository.save(reservation);
 
+
+        BigDecimal finalPrice = preOrderTotal.subtract(depositAmount);
+        BigDecimal limit = new BigDecimal("0");
+
+        if (finalPrice.compareTo(limit) <= 0) {
+            finalPrice = BigDecimal.ZERO;
+        }
+
         Bill bill = Bill.builder()
-                .totalPrice(request.getDepositAmount())
+                .totalPrice(finalPrice)
+                .finalPrice(finalPrice)
                 .partySize(request.getPartySize())
                 .discountAmount(BigDecimal.ZERO)
-                .finalPrice(BigDecimal.ZERO)
                 .status(BillStatus.OPEN)
                 .billTables(new ArrayList<>())
                 .orders(new ArrayList<>())
@@ -141,9 +183,41 @@ public class ReservationService {
 
 
         Bill savedBill = billRepository.save(bill);
-        savedReservation.setBill(savedBill);
-        savedReservation = reservationRepository.save(reservation);
 
+        savedReservation.setBill(savedBill);
+        savedReservation = reservationRepository.save(savedReservation);
+
+
+        if (!resolvedItems.isEmpty()) {
+            Order preOrder = Order.builder()
+                    .bill(savedBill)
+                    .orderType(OrderType.PRE_ORDER)    // ✅ mark as pre-order type
+                    .createdBy(user)
+                    .orderDetails(new ArrayList<>())
+                    .build();
+
+            Order savedOrder = orderRepository.save(preOrder);
+
+            for (ResolvedPreOrderItem resolvedItem : resolvedItems) {
+                OrderDetail detail = OrderDetail.builder()
+                        .order(savedOrder)
+                        .item(resolvedItem.item())
+                        .quantity(resolvedItem.quantity())
+                        .price(resolvedItem.item().getPrice())
+                        .itemStatus(ItemStatus.PENDING)   // ✅ pending until reservation confirmed
+                        .note("Pre-order for reservation #" + savedReservation.getId())
+                        .build();
+
+                savedOrder.getOrderDetails().add(detail);
+            }
+
+            orderRepository.save(savedOrder); // ✅ cascades OrderDetails
+            savedBill.getOrders().add(savedOrder);
+            billRepository.save(savedBill);
+
+            log.info("Pre-order [ID:{}] created with {} item(s) for reservation [ID:{}]",
+                    savedOrder.getId(), resolvedItems.size(), savedReservation.getId());
+        }
 
         // Create bill-table associations and update table status
         for (RestaurantTable table : tables) {
@@ -152,15 +226,16 @@ public class ReservationService {
                     .bill(savedBill)
                     .table(table)
                     .build();
-            table.setStatus(TableStatus.RESERVED);
+//            table.setStatus(TableStatus.RESERVED);
             savedBill.getBillTables().add(billTable);
         }
+
+
         tableRepository.saveAll(tables);
         billRepository.save(savedBill);
 
-        log.info("Created reservation WITH deposit [ID: {}] for customer: {}, partySize: {}, deposit: {}",
-                savedReservation.getId(), savedReservation.getCustomerName(),
-                request.getPartySize(), request.getDepositAmount());
+        log.info("Reservation [ID:{}] — preOrder: {}, tableFee: {}, deposit(10%): {}",
+                savedReservation.getId(), preOrderTotal, tableFee, depositAmount);
 
         return mapToResponse(savedReservation);
     }
@@ -228,7 +303,7 @@ public class ReservationService {
                     .bill(savedBill)
                     .table(table)
                     .build();
-            table.setStatus(TableStatus.RESERVED);
+//            table.setStatus(TableStatus.RESERVED);
             savedBill.getBillTables().add(billTable);
         }
         tableRepository.saveAll(tables);
@@ -257,14 +332,18 @@ public class ReservationService {
 
         log.info("Confirmed reservation ID: {}", reservationId);
 
-        return mapToResponse(saved);
+        ReservationResponse response = mapToResponse(saved);
+
+        reservationMailService.sendReservationConfirmedMail(response);
+
+        return response;
     }
 
     /**
      * Check-in: Customer arrived and seated
      */
     @Transactional
-    public ReservationResponse checkIn(Long reservationId, Long billId) {
+    public ReservationResponse checkIn(Long reservationId) {
         Reservation reservation = getReservationById(reservationId);
 
         if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
@@ -280,7 +359,8 @@ public class ReservationService {
 
         Reservation saved = reservationRepository.save(reservation);
 
-        log.info("Checked in reservation ID: {}, Bill ID: {}", reservationId, billId);
+
+        log.info("Checked in reservation ID: {}, Bill ID: {}", reservationId);
 
         return mapToResponse(saved);
     }
@@ -310,7 +390,11 @@ public class ReservationService {
 
         log.info("Cancelled reservation ID: {}, Reason: {}", reservationId, reason);
 
-        return mapToResponse(saved);
+        ReservationResponse response = mapToResponse(saved);
+
+        reservationMailService.sendReservationCancelledMail(response);
+
+        return response;
     }
 
     /**
@@ -334,8 +418,11 @@ public class ReservationService {
         Reservation saved = reservationRepository.save(reservation);
 
         log.warn("Marked reservation ID: {} as NO_SHOW", reservationId);
+        ReservationResponse response = mapToResponse(saved);
 
-        return mapToResponse(saved);
+        reservationMailService.sendReservationNoShowMail(response);
+
+        return response;
     }
 
     /**
@@ -395,6 +482,38 @@ public class ReservationService {
     private Reservation getReservationById(Long id) {
         return reservationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Reservation not found with ID: " + id));
+    }
+
+    @Scheduled(cron = "0 */5 * * * *")
+    @Transactional
+    public void autoReserveTablesBeforeReservation() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime twoHourLater = now.plusHours(2);
+
+        List<Reservation> upcomingReservations = reservationRepository
+                .findReservationsToReserveTable(now, twoHourLater);
+
+        if (upcomingReservations.isEmpty()) {
+            return;
+        }
+
+        for (Reservation reservation : upcomingReservations) {
+            List<RestaurantTable> tablesToReserve = reservation.getTables().stream()
+                    .filter(t -> t.getStatus() == TableStatus.AVAILABLE)
+                    .toList();
+
+            if (!tablesToReserve.isEmpty()) {
+                tablesToReserve.forEach(table -> table.setStatus(TableStatus.RESERVED));
+                tableRepository.saveAll(tablesToReserve);
+
+                log.info("Auto-reserved {} table(s) for reservation ID: {} (starts at {})",
+                        tablesToReserve.size(),
+                        reservation.getId(),
+                        reservation.getReservationTime());
+            }
+        }
+
+        log.info("Auto-reserve job processed {} upcoming reservations", upcomingReservations.size());
     }
 
     private void validateReservationTime(LocalDateTime reservationTime) {

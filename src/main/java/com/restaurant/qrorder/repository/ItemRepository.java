@@ -16,12 +16,11 @@ import java.util.Optional;
 @Repository
 public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificationExecutor<Item> {
 
-    @Query("SELECT i FROM Item i LEFT JOIN FETCH i.category WHERE i.id = :id")
-    Optional<Item> findByIdWithCategory(Long id);
-
-    List<Item> findByCategoryId(Long categoryId);
-
-    List<Item> findByAvailable(Boolean available);
+    @Query("""
+            SELECT i FROM Item i
+            JOIN FETCH i.category
+            """)
+    List<Item> findAllWithCategory();
 
     Page<Item> findByCategoryId(Long categoryId, Pageable pageable);
 

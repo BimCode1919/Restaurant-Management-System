@@ -44,6 +44,9 @@ public class Item {
     @Column(name = "image_url")
     private String imageUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String embedding;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean available = true;
