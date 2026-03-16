@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -46,6 +47,12 @@ public class CreateReservationRequest {
 
     // Pre-order items (optional)
     private List<PreOrderItemRequest> preOrderItems;
+
+    @NotNull(message = "Reservation start time is required")
+    private LocalTime startTime;
+
+    @NotNull(message = "Reservation end time is required")
+    private LocalTime endTime;
 
     @Data
     @Builder

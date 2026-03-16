@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,47 +40,47 @@ public class ReservationService {
     /**
      * Tạo reservation mới
      */
-    @Transactional
-    public ReservationResponse createReservation(CreateReservationRequest request, Long userId) {
-        // Validate reservation time
-        validateReservationTime(request.getReservationTime());
-
-        // Check table availability
-        List<RestaurantTable> tables = findAndValidateTables(
-                request.getRequestedTableIds(),
-                request.getPartySize(),
-                request.getReservationTime()
-        );
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Create reservation
-        Reservation reservation = Reservation.builder()
-                .customerName(request.getCustomerName())
-                .customerPhone(request.getCustomerPhone())
-                .customerEmail(request.getCustomerEmail())
-                .partySize(request.getPartySize())
-                .reservationTime(request.getReservationTime())
-                .status(ReservationStatus.PENDING)
-                .note(request.getNote())
-                .depositRequired(false)
-                .depositAmount(BigDecimal.ZERO)
-                .depositPaid(false)
-                .createdBy(user)
-                .tables(tables)
-                .build();
-
-
-//        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
-        tableRepository.saveAll(tables);
-
-        Reservation saved = reservationRepository.save(reservation);
-
-        log.info("Created reservation ID: {} for customer: {}", saved.getId(), saved.getCustomerName());
-
-        return mapToResponse(saved);
-    }
+//    @Transactional
+//    public ReservationResponse createReservation(CreateReservationRequest request, Long userId) {
+//        // Validate reservation time
+//        validateReservationTime(request.getReservationTime());
+//
+//        // Check table availability
+//        List<RestaurantTable> tables = findAndValidateTables(
+//                request.getRequestedTableIds(),
+//                request.getPartySize(),
+//                request.getReservationTime()
+//        );
+//
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//        // Create reservation
+//        Reservation reservation = Reservation.builder()
+//                .customerName(request.getCustomerName())
+//                .customerPhone(request.getCustomerPhone())
+//                .customerEmail(request.getCustomerEmail())
+//                .partySize(request.getPartySize())
+//                .reservationTime(request.getReservationTime())
+//                .status(ReservationStatus.PENDING)
+//                .note(request.getNote())
+//                .depositRequired(false)
+//                .depositAmount(BigDecimal.ZERO)
+//                .depositPaid(false)
+//                .createdBy(user)
+//                .tables(tables)
+//                .build();
+//
+//
+////        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
+//        tableRepository.saveAll(tables);
+//
+//        Reservation saved = reservationRepository.save(reservation);
+//
+//        log.info("Created reservation ID: {} for customer: {}", saved.getId(), saved.getCustomerName());
+//
+//        return mapToResponse(saved);
+//    }
 
     @Transactional
     public ReservationResponse createReservationAndBill(CreateReservationRequest request, Long userId) {
@@ -89,7 +91,9 @@ public class ReservationService {
         List<RestaurantTable> tables = findAndValidateTables(
                 request.getRequestedTableIds(),
                 request.getPartySize(),
-                request.getReservationTime()
+                request.getReservationTime(),
+                request.getStartTime(),
+                request.getEndTime()
         );
 
         boolean isLargeGroup  = request.getPartySize() != null && request.getPartySize() > 10;
@@ -131,15 +135,15 @@ public class ReservationService {
             }
         }
 
+        preOrderTotal = preOrderTotal.multiply(new BigDecimal("0.10"))
+                                    .setScale(0, RoundingMode.HALF_UP);;
         //Table fee
-        BigDecimal tableFee = BigDecimal.valueOf(300_000L)
+        BigDecimal tableFee = BigDecimal.valueOf(100_000L)
                 .multiply(BigDecimal.valueOf(tables.size()));
 
-        // ─── Step 3: deposit = (preOrderTotal + tableFee) × 10% ──────────────────
+        // ─── Step 3: deposit = (preOrderTotal * 10% + tableFee) ──────────────────
         BigDecimal depositBase   = preOrderTotal.add(tableFee);
-        BigDecimal depositAmount = depositBase
-                .multiply(new BigDecimal("0.10"))
-                .setScale(0, RoundingMode.HALF_UP);
+
 
         // Create reservation
         Reservation reservation = Reservation.builder()
@@ -151,19 +155,20 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .note(request.getNote())
                 .depositRequired(true)
-                .depositAmount(depositAmount)
+                .depositAmount(depositBase)
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
                 .build();
 
 
 
-        tables.forEach(table -> table.setStatus(TableStatus.RESERVED));
         Reservation savedReservation = reservationRepository.save(reservation);
 
 
-        BigDecimal finalPrice = preOrderTotal.subtract(depositAmount);
+        BigDecimal finalPrice = preOrderTotal.subtract(depositBase);
         BigDecimal limit = new BigDecimal("0");
 
         if (finalPrice.compareTo(limit) <= 0) {
@@ -210,7 +215,7 @@ public class ReservationService {
 
                 savedOrder.getOrderDetails().add(detail);
             }
-
+            savedOrder.setReservation(savedReservation);
             orderRepository.save(savedOrder); // ✅ cascades OrderDetails
             savedBill.getOrders().add(savedOrder);
             billRepository.save(savedBill);
@@ -235,7 +240,7 @@ public class ReservationService {
         billRepository.save(savedBill);
 
         log.info("Reservation [ID:{}] — preOrder: {}, tableFee: {}, deposit(10%): {}",
-                savedReservation.getId(), preOrderTotal, tableFee, depositAmount);
+                savedReservation.getId(), preOrderTotal, tableFee, depositBase);
 
         return mapToResponse(savedReservation);
     }
@@ -255,7 +260,9 @@ public class ReservationService {
         List<RestaurantTable> tables = findAndValidateTables(
                 request.getRequestedTableIds(),
                 request.getPartySize(),
-                request.getReservationTime()
+                request.getReservationTime(),
+                request.getStartTime(),
+                request.getEndTime()
         );
 
         User user = userRepository.findById(userId)
@@ -275,9 +282,12 @@ public class ReservationService {
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
                 .build();
 
         Reservation savedReservation = reservationRepository.save(reservation);
+
 
         Bill bill = Bill.builder()
                 .totalPrice(BigDecimal.ZERO)
@@ -538,9 +548,12 @@ public class ReservationService {
     private List<RestaurantTable> findAndValidateTables(
             List<Long> requestedTableIds,
             Integer partySize,
-            LocalDateTime reservationTime) {
+            LocalDateTime reservationTime,
+            LocalTime startTime,    // ✅ added
+            LocalTime endTime ) {
 
         LocalDateTime end = reservationTime.plusHours(2); // Assume 2 hour dining period
+        validateTimeSlot(startTime, endTime);
 
         List<RestaurantTable> tables;
 
@@ -571,6 +584,21 @@ public class ReservationService {
         }
 
         return tables;
+    }
+
+    private void validateTimeSlot(LocalTime startTime, LocalTime endTime) {
+        if (startTime == null || endTime == null) {
+            throw new InvalidOperationException("Start time and end time are required");
+        }
+        if (!endTime.isAfter(startTime)) {
+            throw new InvalidOperationException("End time must be after start time");
+        }
+        if (Duration.between(startTime, endTime).toMinutes() < 30) {
+            throw new InvalidOperationException("Reservation must be at least 30 minutes");
+        }
+        if (startTime.getHour() < 9 || endTime.getHour() >= 22) {
+            throw new InvalidOperationException("Reservations only available between 09:00 and 22:00");
+        }
     }
 
     private ReservationResponse mapToResponse(Reservation reservation) {

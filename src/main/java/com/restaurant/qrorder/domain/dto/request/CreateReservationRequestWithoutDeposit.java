@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -35,6 +36,12 @@ public class CreateReservationRequestWithoutDeposit {
     @NotNull(message = "Reservation time is required")
     @Future(message = "Reservation time must be in the future")
     private LocalDateTime reservationTime;
+
+    @NotNull(message = "Reservation start time is required")
+    private LocalTime startTime;
+
+    @NotNull(message = "Reservation end time is required")
+    private LocalTime endTime;
 
     private String note;
 
