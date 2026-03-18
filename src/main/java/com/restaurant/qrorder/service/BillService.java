@@ -255,41 +255,29 @@ public class BillService {
     public Bill recalculateBill(Long billId) {
         Bill bill = getBillById(billId);
 
-        // Calculate total price from all orders
         BigDecimal totalPrice = bill.getOrders().stream()
                 .flatMap(order -> order.getOrderDetails().stream())
                 .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal oldTotalPrice = bill.getTotalPrice();
-        bill.setTotalPrice((oldTotalPrice.add(totalPrice)));
+        bill.setTotalPrice(totalPrice);  // ← replace, not add
 
-        // Recalculate discount if exists
         if (bill.getDiscount() != null) {
             DiscountService.DiscountCalculationResult result =
                     discountService.calculateDiscountAmount(bill.getDiscount(), bill);
             bill.setDiscountAmount(result.getDiscountAmount());
         }
 
-        // Calculate final price
-
-        if(bill.getReservation() != null) {
-            BigDecimal totalAmountAfterDeposit = bill.getTotalPrice().subtract(bill.getReservation().getDepositAmount());
-            BigDecimal limit = new BigDecimal("0");
-            if (totalAmountAfterDeposit.compareTo(limit) <= 0) {
-                totalAmountAfterDeposit = BigDecimal.ZERO;
-            }
-
-            bill.setTotalPrice(totalAmountAfterDeposit);
+        if (bill.getReservation() != null && bill.getReservation().getDepositAmount() != null) {
+            BigDecimal afterDeposit = bill.getTotalPrice().subtract(bill.getReservation().getDepositAmount());
+            bill.setTotalPrice(afterDeposit.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : afterDeposit);
         }
 
         bill.setFinalPrice(bill.getTotalPrice().subtract(bill.getDiscountAmount()));
 
         Bill savedBill = billRepository.save(bill);
-
         log.info("Recalculated bill {}: Total={}, Discount={}, Final={}",
                 billId, bill.getTotalPrice(), bill.getDiscountAmount(), bill.getFinalPrice());
-
         return savedBill;
     }
 
