@@ -4,6 +4,12 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+CREATE TABLE IF NOT EXISTS bill_previous_ids (
+    bill_id          BIGINT NOT NULL REFERENCES bills(id),
+    previous_bill_id BIGINT NOT NULL
+);
+
+ALTER TABLE orders ADD COLUMN original_bill_id BIGINT;
 -- Set default timezone
 SET timezone = 'Asia/Ho_Chi_Minh';
 
