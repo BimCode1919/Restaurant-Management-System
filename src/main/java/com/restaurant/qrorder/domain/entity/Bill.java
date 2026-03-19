@@ -72,6 +72,12 @@ public class Bill {
     @Builder.Default
     private List<Order> orders = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "bill_previous_ids", joinColumns = @JoinColumn(name = "bill_id"))
+    @Column(name = "previous_bill_id")
+    @Builder.Default
+    private List<Long> previousBillIds = new ArrayList<>();
+
     // Helper method to get table numbers
     public List<String> getTableNumbers() {
         return billTables.stream()

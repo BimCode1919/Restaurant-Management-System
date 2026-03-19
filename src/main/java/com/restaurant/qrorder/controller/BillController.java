@@ -3,6 +3,7 @@ package com.restaurant.qrorder.controller;
 import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateBillRequest;
 import com.restaurant.qrorder.domain.dto.request.MergeBillRequest;
+import com.restaurant.qrorder.domain.dto.request.UnmergeBillRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.BillResponse;
 import com.restaurant.qrorder.service.BillService;
@@ -60,11 +61,11 @@ public class BillController {
     @Operation(summary = "Get all bills", description = "Retrieve all bills or filter by status (Admin/Staff only)")
     public ResponseEntity<ApiResponse<List<BillResponse>>> getAllBills(
             @RequestParam(required = false) BillStatus status) {
-        
-        List<BillResponse> responses = status != null 
+
+        List<BillResponse> responses = status != null
                 ? billService.getBillsByStatus(status)
                 : billService.getAllBills();
-        
+
         return ResponseEntity.ok(
                 ApiResponse.<List<BillResponse>>builder()
                         .statusCode(HttpStatus.OK.value())
@@ -79,10 +80,10 @@ public class BillController {
     public ResponseEntity<ApiResponse<BillResponse>> applyDiscount(
             @PathVariable Long id,
             @RequestParam Long discountId) {
-        
+
         billService.applyDiscount(id, discountId);
         BillResponse response = billService.getBillResponseById(id);
-        
+
         return ResponseEntity.ok(
                 ApiResponse.<BillResponse>builder()
                         .statusCode(HttpStatus.OK.value())
@@ -97,7 +98,7 @@ public class BillController {
     public ResponseEntity<ApiResponse<BillResponse>> applyBestDiscount(@PathVariable Long id) {
         billService.applyBestDiscount(id);
         BillResponse response = billService.getBillResponseById(id);
-        
+
         return ResponseEntity.ok(
                 ApiResponse.<BillResponse>builder()
                         .statusCode(HttpStatus.OK.value())
@@ -112,7 +113,7 @@ public class BillController {
     public ResponseEntity<ApiResponse<BillResponse>> removeDiscount(@PathVariable Long id) {
         billService.removeDiscount(id);
         BillResponse response = billService.getBillResponseById(id);
-        
+
         return ResponseEntity.ok(
                 ApiResponse.<BillResponse>builder()
                         .statusCode(HttpStatus.OK.value())
@@ -146,4 +147,19 @@ public class BillController {
                         .data(response)
                         .build());
     }
+
+    @DeleteMapping("/unmerge")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Unmerge bill", description = "Restore previously merged bills back to their original state")
+    public ResponseEntity<ApiResponse<List<BillResponse>>> unmergeBill(@Valid @RequestBody UnmergeBillRequest request) {
+        List<BillResponse> response = billService.unmergeBill(request.getBillId());
+        return ResponseEntity.ok(
+                ApiResponse.<List<BillResponse>>builder()
+                        .statusCode(HttpStatus.OK.value())
+                        .message("Bill unmerged successfully")
+                        .data(response)
+                        .build());
+    }
+
+
 }
