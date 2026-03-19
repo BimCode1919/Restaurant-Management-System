@@ -212,7 +212,8 @@ CREATE TABLE IF NOT EXISTS order_details (
 CREATE TABLE IF NOT EXISTS bill_tables (
     bill_id BIGINT NOT NULL REFERENCES bills(id),
     table_id BIGINT NOT NULL REFERENCES tables(id),
-    PRIMARY KEY (bill_id, table_id)
+    PRIMARY KEY (bill_id, table_id),
+    original_bill_id BIGINT
 );
 
 -- Reservation Tables (junction table)
@@ -247,6 +248,13 @@ CREATE TABLE IF NOT EXISTS discount_items (
     PRIMARY KEY (discount_id, item_id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS bill_previous_ids (
+    bill_id          BIGINT NOT NULL REFERENCES bills(id),
+    previous_bill_id BIGINT NOT NULL
+);
+
+ALTER TABLE orders ADD COLUMN original_bill_id BIGINT;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_discounts_value_type ON discounts(value_type);
