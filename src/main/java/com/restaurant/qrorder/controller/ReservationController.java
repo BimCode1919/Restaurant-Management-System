@@ -2,7 +2,8 @@ package com.restaurant.qrorder.controller;
 
 import com.restaurant.qrorder.domain.common.ReservationStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateReservationRequest;
-import com.restaurant.qrorder.domain.dto.request.CreateReservationRequestWithoutDeposit;
+import com.restaurant.qrorder.domain.dto.request.UpdateReservationRequest;
+import com.restaurant.qrorder.domain.dto.response.BookedSlotResponse;
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import com.restaurant.qrorder.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,11 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -33,152 +32,117 @@ public class ReservationController {
 
     private final ReservationService reservationService;
 
-    @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
-    @Operation(summary = "Create reservation without deposit", description = "Create a new restaurant reservation (Authenticated users)")
-    public ResponseEntity<ReservationResponse> createReservationWithoutDeposit(
-            @RequestBody @Valid CreateReservationRequestWithoutDeposit request,
-            Authentication authentication) {
-
-        Long userId = getUserIdFromAuth(authentication);
-
-        ReservationResponse response = reservationService.createReservationWithoutDeposit(request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+    // ─── CREATE ──────────────────────────────────────────────────────────────
 
     /**
-     * Create new reservation
+     * Single endpoint for all reservation types.
+     * Deposit is auto-determined by the service:
+     *   partySize > 10 OR preOrderItems present → deposit required
      */
-    @PostMapping("/deposit")
+    @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
-    @Operation(summary = "Create reservation with deposit", description = "Create a new restaurant reservation (Authenticated users)")
+    @Operation(summary = "Create reservation",
+               description = "Deposit auto-determined: partySize > 10 or pre-orders present triggers deposit")
     public ResponseEntity<ReservationResponse> createReservation(
             @Valid @RequestBody CreateReservationRequest request,
             Authentication authentication) {
-        
-        // Get user ID from authentication
-        Long userId = getUserIdFromAuth(authentication);
-        
-        ReservationResponse response = reservationService.createReservationAndBill(request, userId);
+
+        ReservationResponse response = reservationService.createReservation(request, authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/bill")
-    @Operation(summary = "Create reservation and auto make bill", description = "Create a new restaurant reservation and bill (Authenticated users)")
-    public ResponseEntity<ReservationResponse> createReservationAndBIll(
-            @Valid @RequestBody CreateReservationRequest request,
-            Authentication authentication) {
+    // ─── READ ─────────────────────────────────────────────────────────────────
 
-        // Get user ID from authentication
-        Long userId = getUserIdFromAuth(authentication);
-
-        ReservationResponse response = reservationService.createReservationAndBill(request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    /**
-     * Get reservation by ID
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @Operation(summary = "Get reservation by ID", description = "Retrieve reservation details (Admin/Staff only)")
+    @Operation(summary = "Get reservation by ID")
     public ResponseEntity<ReservationResponse> getReservation(@PathVariable Long id) {
-        ReservationResponse response = reservationService.getReservation(id);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(reservationService.getReservation(id));
     }
 
-    @PostMapping("/reserve-tables")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Auto update table status to reserved before on hour to reservation",
-            description = "Retrieve reservation details (Admin/Staff only)")
-    public ResponseEntity<String> triggerReserveTables() {
-        reservationService.autoReserveTablesBeforeReservation();
-        return ResponseEntity.ok("Auto-reserve tables job triggered successfully");
-    }
-
-    /**
-     * List reservations by date range
-     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @Operation(summary = "List reservations", description = "Get reservations by date range or status (Admin/Staff only)")
+    @Operation(summary = "List reservations by status")
     public ResponseEntity<List<ReservationResponse>> getReservations(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(required = false) ReservationStatus status) {
-        
-        List<ReservationResponse> responses;
-        
-        if (status != null) {
-            responses = reservationService.getReservationsByStatus(status);
-        } else if (startDate != null && endDate != null) {
-            responses = reservationService.getReservationsByDateRange(startDate, endDate);
-        } else {
-            // Default: today's reservations
-            LocalDateTime start = LocalDateTime.now().withHour(0).withMinute(0);
-            LocalDateTime end = start.plusDays(1);
-            responses = reservationService.getReservationsByDateRange(start, end);
-        }
-        
-        return ResponseEntity.ok(responses);
+
+        return ResponseEntity.ok(reservationService.getReservationsByStatus(status));
     }
 
-    /**
-     * Confirm reservation
-     */
+    @GetMapping("/availability")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Get booked slots for a date — safe for customers, no PII exposed",
+               description = "Returns PENDING/CONFIRMED/SEATED reservations for the given date. " +
+                             "Default: today. Only shows time, tables, party size — no customer info.")
+    public ResponseEntity<List<BookedSlotResponse>> getAvailability(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        LocalDate target = date != null ? date : LocalDate.now();
+        return ResponseEntity.ok(reservationService.getBookedSlots(target));
+    }
+
+    // ─── UPDATE ───────────────────────────────────────────────────────────────
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @Operation(summary = "Update reservation details (PENDING only)")
+    public ResponseEntity<ReservationResponse> updateReservation(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateReservationRequest request) {
+        return ResponseEntity.ok(reservationService.updateReservation(id, request));
+    }
+
+    // ─── STATUS TRANSITIONS ───────────────────────────────────────────────────
+
     @PutMapping("/{id}/confirm")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @Operation(summary = "Confirm reservation", description = "Confirm a pending reservation (Admin/Staff only)")
+    @Operation(summary = "Confirm a PENDING reservation")
     public ResponseEntity<ReservationResponse> confirmReservation(@PathVariable Long id) {
-        ReservationResponse response = reservationService.confirmReservation(id);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(reservationService.confirmReservation(id));
     }
 
-    /**
-     * Check-in reservation (customer arrived)
-     */
     @PutMapping("/{id}/check-in")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @Operation(summary = "Check-in reservation", description = "Mark customer as arrived and seated (Admin/Staff only)")
-    public ResponseEntity<ReservationResponse> checkIn(
-            @PathVariable Long id) {
-        
-        ReservationResponse response = reservationService.checkIn(id);
-        return ResponseEntity.ok(response);
+    @Operation(summary = "Check-in: mark customer as arrived and seated")
+    public ResponseEntity<ReservationResponse> checkIn(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.checkIn(id));
     }
 
-    /**
-     * Cancel reservation
-     */
     @PutMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
-    @Operation(summary = "Cancel reservation", description = "Cancel a reservation (Admin/Staff only)")
+    @Operation(summary = "Cancel a reservation")
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable Long id,
             @RequestParam(required = false) String reason) {
-        
-        ReservationResponse response = reservationService.cancelReservation(id, reason);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(reservationService.cancelReservation(id, reason));
     }
 
-    /**
-     * Mark reservation as no-show
-     */
     @PutMapping("/{id}/no-show")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
-    @Operation(summary = "Mark as no-show", description = "Mark reservation as no-show (Admin/Staff only)")
+    @Operation(summary = "Mark reservation as no-show")
     public ResponseEntity<ReservationResponse> markAsNoShow(
             @PathVariable Long id,
             @RequestParam(required = false) String reason) {
-        
-        ReservationResponse response = reservationService.markAsNoShow(id, reason);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(reservationService.markAsNoShow(id, reason));
     }
 
-    // Helper method to extract user ID from authentication
-    private Long getUserIdFromAuth(Authentication authentication) {
-        // Implement based on your authentication mechanism
-        // For now, return a mock value
-        return 1L;
+    // ─── DEPOSIT ──────────────────────────────────────────────────────────────
+
+    @PutMapping("/{id}/deposit-paid")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
+    @Operation(summary = "Mark reservation deposit as paid")
+    public ResponseEntity<ReservationResponse> markDepositPaid(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.markDepositAsPaid(id));
+    }
+
+    // ─── ADMIN TRIGGER ────────────────────────────────────────────────────────
+
+    @PostMapping("/reserve-tables")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Manually trigger the auto-reserve-tables scheduled job")
+    public ResponseEntity<String> triggerReserveTables() {
+        reservationService.autoReserveTablesBeforeReservation();
+        return ResponseEntity.ok("Auto-reserve tables job triggered successfully");
     }
 }

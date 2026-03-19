@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(./mvnw compile:*)",
+      "Bash(cmd /c \"mvn compile -q 2>&1\")"
+    ]
+  }
+}

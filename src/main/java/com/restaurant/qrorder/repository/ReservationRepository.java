@@ -38,20 +38,25 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT r FROM Reservation r WHERE r.status IN ('PENDING', 'CONFIRMED', 'SEATED')")
     List<Reservation> findActiveReservations();
 
-    // Check if tables are available at specific time
+    // Check if tables have overlapping reservations in the given time window.
+    // Overlap condition: existing.start < newEnd AND existing.start > newStart - DINING_HOURS
+    // Pass excludeId = 0L when creating (no reservation to exclude).
     @Query("SELECT r FROM Reservation r JOIN r.tables t WHERE t.id IN :tableIds " +
-           "AND r.status IN ('CONFIRMED', 'SEATED') " +
-           "AND r.reservationTime BETWEEN :start AND :end")
+           "AND r.id != :excludeId " +
+           "AND r.status IN ('PENDING', 'CONFIRMED', 'SEATED') " +
+           "AND r.reservationTime < :end " +
+           "AND r.reservationTime > :startMinus2h")
     List<Reservation> findConflictingReservations(
             @Param("tableIds") List<Long> tableIds,
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
+            @Param("end") LocalDateTime end,
+            @Param("startMinus2h") LocalDateTime startMinus2h,
+            @Param("excludeId") Long excludeId
     );
 
     @Query("""
         SELECT r FROM Reservation r
         JOIN FETCH r.tables t
-        WHERE r.status = 'PENDING'
+        WHERE r.status = 'CONFIRMED'
         AND r.reservationTime BETWEEN :now AND :twoHourLater
         AND t.status = 'AVAILABLE'
     """)
