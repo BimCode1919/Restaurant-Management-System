@@ -7,10 +7,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Unified reservation request DTO.
+ *
+ * Deposit is determined automatically by the service:
+ *   - partySize > 10      → deposit required
+ *   - preOrderItems present → deposit required
+ *   - otherwise             → no deposit
+ *
+ * requestedTableIds is optional; omit/null to let the system auto-assign.
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,13 +47,12 @@ public class CreateReservationRequest {
 
     private String note;
 
-
-    // Requested table IDs (optional)
-    @NotEmpty(message = "Table need to not be fill ín !!!!")
+    // Optional: explicit table selection. If null/empty the system auto-assigns.
     @Valid
     private List<Long> requestedTableIds;
 
-    // Pre-order items (optional)
+    // Optional: pre-order items. Presence triggers deposit requirement.
+    @Valid
     private List<PreOrderItemRequest> preOrderItems;
 
     @Data
@@ -52,6 +60,7 @@ public class CreateReservationRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PreOrderItemRequest {
+
         @NotNull(message = "Item ID is required")
         private Long itemId;
 
