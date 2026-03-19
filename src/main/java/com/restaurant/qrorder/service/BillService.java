@@ -21,10 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,20 +35,15 @@ public class BillService {
     private final ReservationRepository reservationRepository;
     private final DiscountMapper discountMapper;
 
-    /**
-     * Create new bill
-     */
     @Transactional
     public BillResponse createBill(CreateBillRequest request) {
         log.info("Creating new bill for {} tables, party size: {}", request.getTableIds().size(), request.getPartySize());
 
-        // Validate and get tables
         List<RestaurantTable> tables = request.getTableIds().stream()
                 .map(id -> tableRepository.findById(id)
                         .orElseThrow(() -> new ResourceNotFoundException("Table not found with ID: " + id)))
                 .collect(Collectors.toList());
 
-        // Check if tables are available
         tables.forEach(table -> {
             if (table.getStatus() != TableStatus.AVAILABLE) {
                 throw new InvalidOperationException("Table " + table.getTableNumber() + " is not available");
@@ -68,7 +60,6 @@ public class BillService {
                 .orders(new ArrayList<>())
                 .build();
 
-        // Link to reservation if provided
         if (request.getReservationId() != null) {
             Reservation reservation = reservationRepository.findById(request.getReservationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
@@ -77,69 +68,45 @@ public class BillService {
 
         Bill savedBill = billRepository.save(bill);
 
-        // Create bill-table associations and update table status
         for (RestaurantTable table : tables) {
-            BillTable.BillTableId id = new BillTable.BillTableId(savedBill.getId(), table.getId());
             BillTable billTable = BillTable.builder()
-                    .id(id)
+                    .id(new BillTable.BillTableId(savedBill.getId(), table.getId()))
                     .bill(savedBill)
                     .table(table)
                     .build();
             savedBill.getBillTables().add(billTable);
-
-            // Update table status to OCCUPIED
             table.setStatus(TableStatus.OCCUPIED);
             tableRepository.save(table);
         }
 
         billRepository.save(savedBill);
-
         log.info("Bill created successfully with ID: {}", savedBill.getId());
         return mapToResponse(savedBill);
     }
 
-    /**
-     * Get bill by ID
-     */
     @Transactional(readOnly = true)
     public BillResponse getBillResponseById(Long billId) {
-        Bill bill = getBillById(billId);
-        return mapToResponse(bill);
+        return mapToResponse(getBillById(billId));
     }
 
-    /**
-     * Get all bills
-     */
     @Transactional(readOnly = true)
     public List<BillResponse> getAllBills() {
-        return billRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return billRepository.findAll().stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    /**
-     * Get bills by status
-     */
     @Transactional(readOnly = true)
     public List<BillResponse> getBillsByStatus(BillStatus status) {
-        return billRepository.findByStatus(status).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return billRepository.findByStatus(status).stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    /**
-     * Close bill
-     */
     @Transactional
     public BillResponse closeBill(Long billId) {
         log.info("Closing bill {}", billId);
-
         Bill bill = getBillById(billId);
 
         if (bill.getStatus() == BillStatus.CLOSED) {
             throw new InvalidOperationException("Bill is already closed");
         }
-
         if (bill.getStatus() != BillStatus.PAID) {
             throw new InvalidOperationException("Bill must be paid before closing");
         }
@@ -147,30 +114,21 @@ public class BillService {
         bill.setStatus(BillStatus.CLOSED);
         bill.setClosedAt(LocalDateTime.now());
 
-        // Update all tables back to AVAILABLE
         bill.getBillTables().forEach(billTable -> {
             RestaurantTable table = billTable.getTable();
             table.setStatus(TableStatus.AVAILABLE);
             tableRepository.save(table);
         });
 
-        Bill savedBill = billRepository.save(bill);
-
         log.info("Bill {} closed successfully", billId);
-        return mapToResponse(savedBill);
+        return mapToResponse(billRepository.save(bill));
     }
 
-    /**
-     * Get bill by ID (internal use)
-     */
     public Bill getBillById(Long billId) {
         return billRepository.findById(billId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bill not found with ID: " + billId));
     }
 
-    /**
-     * Calculate and apply best discount to bill
-     */
     @Transactional
     public BillResponse applyBestDiscount(Long billId) {
         Bill bill = getBillById(billId);
@@ -180,18 +138,13 @@ public class BillService {
         }
 
         DiscountResponse discountResponse = discountService.findBestDiscount(bill);
-
-        // ← use the new method that finds AND applies in one call
-
         discountService.applyDiscountToBill(bill, discountResponse.getId());
-
         Bill savedBill = billRepository.save(bill);
 
         if (discountResponse.getId() != null) {
             log.info("Applied best discount [{}] to bill [{}]: discountAmount={}, finalPrice={}",
                     discountResponse.getName(), billId,
-                    discountResponse.getMaxDiscountAmount(),
-                    discountResponse.getCalculatedAmount());
+                    discountResponse.getMaxDiscountAmount(), discountResponse.getCalculatedAmount());
         } else {
             log.info("No applicable discount found for bill [{}]", billId);
         }
@@ -199,58 +152,35 @@ public class BillService {
         return mapToResponse(savedBill);
     }
 
-
-
-    /**
-     * Apply specific discount to bill
-     */
     @Transactional
-    public Bill applyDiscount(Long billId, Long discountId) {
+    public BillResponse applyDiscount(Long billId, Long discountId) {
         Bill bill = getBillById(billId);
-
         if (bill.getStatus() != BillStatus.OPEN) {
             throw new RuntimeException("Can only apply discount to open bills");
         }
-
         discountService.applyDiscountToBill(bill, discountId);
         Bill savedBill = billRepository.save(bill);
-
         log.info("Applied discount {} to bill {}", discountId, billId);
-
-        return savedBill;
+        return mapToResponse(savedBill);
     }
 
-    /**
-     * Remove discount from bill
-     */
     @Transactional
-    public Bill removeDiscount(Long billId) {
+    public BillResponse removeDiscount(Long billId) {
         Bill bill = getBillById(billId);
-
         if (bill.getDiscount() == null) {
             throw new RuntimeException("Bill has no discount to remove");
         }
-
-        // Decrement usage count
         Discount discount = bill.getDiscount();
         if (discount.getUsedCount() > 0) {
             discount.setUsedCount(discount.getUsedCount() - 1);
         }
-
         bill.setDiscount(null);
         bill.setDiscountAmount(BigDecimal.ZERO);
         bill.setFinalPrice(bill.getTotalPrice());
-
-        Bill savedBill = billRepository.save(bill);
-
         log.info("Removed discount from bill {}", billId);
-
-        return savedBill;
+        return mapToResponse(billRepository.save(bill));
     }
 
-    /**
-     * Recalculate bill totals (after adding/removing items)
-     */
     @Transactional
     public Bill recalculateBill(Long billId) {
         Bill bill = getBillById(billId);
@@ -260,7 +190,7 @@ public class BillService {
                 .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        bill.setTotalPrice(totalPrice);  // ← replace, not add
+        bill.setTotalPrice(totalPrice);
 
         if (bill.getDiscount() != null) {
             DiscountService.DiscountCalculationResult result =
@@ -281,35 +211,8 @@ public class BillService {
         return savedBill;
     }
 
-    /**
-     * Find best discount for bill without applying
-     */
     public DiscountResponse findBestDiscount(Long billId) {
-        Bill bill = getBillById(billId);
-        return discountService.findBestDiscount(bill);
-    }
-
-    /**
-     * Map Bill entity to BillResponse DTO
-     */
-    private BillResponse mapToResponse(Bill bill) {
-        return BillResponse.builder()
-                .id(bill.getId())
-                .totalPrice(bill.getTotalPrice())
-                .partySize(bill.getPartySize())
-                .discount(bill.getDiscount() != null ? discountMapper.toResponse(bill.getDiscount()) : null)
-                .discountAmount(bill.getDiscountAmount())
-                .finalPrice(bill.getFinalPrice())
-                .status(bill.getStatus())
-                .reservationId(bill.getReservation() != null ? bill.getReservation().getId() : null)
-                .paymentId(bill.getPayment() != null ? bill.getPayment().getId() : null)
-                .tableNumbers(bill.getTableNumbers())
-                .orders(bill.getOrders().stream()
-                        .map(this::mapOrderToResponse)
-                        .collect(Collectors.toList()))
-                .createdAt(bill.getCreatedAt())
-                .closedAt(bill.getClosedAt())
-                .build();
+        return discountService.findBestDiscount(getBillById(billId));
     }
 
     @Transactional
@@ -331,14 +234,12 @@ public class BillService {
             throw new InvalidOperationException("Bill " + billId + " has no merge history to unmerge");
         }
 
-        // Re-parent orders back to their original bills by matching bill association
         List<Bill> extractedBills = new ArrayList<>();
 
         for (Long previousId : mergedBill.getPreviousBillIds()) {
             Bill previousBill = billRepository.findById(previousId)
                     .orElseThrow(() -> new ResourceNotFoundException("Previous bill not found with ID: " + previousId));
 
-            // Move orders belonging to this previous bill back
             List<Order> ordersToMove = mergedBill.getOrders().stream()
                     .filter(order -> order.getOriginalBillId() != null
                             && order.getOriginalBillId().equals(previousId))
@@ -350,7 +251,17 @@ public class BillService {
                 mergedBill.getOrders().remove(order);
             });
 
-            // Recalculate previous bill total
+            mergedBill.getBillTables().stream()
+                    .filter(bt -> previousId.equals(bt.getOriginalBillId()))
+                    .forEach(bt -> {
+                        BillTable restored = BillTable.builder()
+                                .id(new BillTable.BillTableId(previousBill.getId(), bt.getTable().getId()))
+                                .bill(previousBill)
+                                .table(bt.getTable())
+                                .build();
+                        previousBill.getBillTables().add(restored);
+                    });
+
             BigDecimal total = previousBill.getOrders().stream()
                     .flatMap(o -> o.getOrderDetails().stream())
                     .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
@@ -362,31 +273,25 @@ public class BillService {
             previousBill.setStatus(BillStatus.OPEN);
 
             extractedBills.add(billRepository.save(previousBill));
-            log.info("Restored previous bill {}", previousId);
+            log.info("Restored previous bill {} with {} tables", previousId, previousBill.getBillTables().size());
         }
+
         log.info("Unmerge complete — bill {} split back into bills {}", billId, mergedBill.getPreviousBillIds());
         billRepository.delete(mergedBill);
-        return extractedBills.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+
+        return extractedBills.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    /**
-     * Merge multiple open bills into a brand new bill.
-     * All source bills are marked as MERGED.
-     */
     @Transactional
     public BillResponse mergeBills(List<Long> billIds) {
         log.info("Merging bills {} into a new bill", billIds);
 
-        // ── Guards ────────────────────────────────────────────────────────────
         if (billIds == null || billIds.size() < 2) {
             throw new InvalidOperationException("At least two bill IDs are required to merge");
         }
         if (billIds.size() != new HashSet<>(billIds).size()) {
             throw new InvalidOperationException("Duplicate bill IDs found in merge request");
         }
-
 
         List<Bill> sourceBills = billIds.stream()
                 .map(id -> {
@@ -399,7 +304,6 @@ public class BillService {
                 })
                 .collect(Collectors.toList());
 
-        // ── Build new bill ────────────────────────────────────────────────────
         int totalPartySize = sourceBills.stream()
                 .mapToInt(b -> b.getPartySize() != null ? b.getPartySize() : 0)
                 .sum();
@@ -415,45 +319,53 @@ public class BillService {
                 .build();
 
         Bill savedMergedBill = billRepository.save(mergedBill);
-        savedMergedBill.getPreviousBillIds().addAll(billIds);
-        // ── Absorb orders and tables from each source bill ────────────────────
-        Set<Long> assignedTableIds = new HashSet<>();
 
         for (Bill source : sourceBills) {
+            if (source.getPreviousBillIds() != null && !source.getPreviousBillIds().isEmpty()) {
+                savedMergedBill.getPreviousBillIds().addAll(source.getPreviousBillIds());
+            } else {
+                savedMergedBill.getPreviousBillIds().add(source.getId());
+            }
+        }
 
-            // Re-parent orders to the new bill
+        Map<RestaurantTable, Long> tableToOriginalBillId = new LinkedHashMap<>();
+
+        for (Bill source : sourceBills) {
             source.getOrders().forEach(order -> {
-                order.setOriginalBillId(source.getId());
+                if (order.getOriginalBillId() == null) {
+                    order.setOriginalBillId(source.getId());
+                }
                 order.setBill(savedMergedBill);
                 savedMergedBill.getOrders().add(order);
             });
 
-            // Re-parent tables, skipping any already linked
             source.getBillTables().forEach(bt -> {
-                RestaurantTable table = bt.getTable();
-                if (assignedTableIds.add(table.getId())) {
-                    BillTable.BillTableId newId =
-                            new BillTable.BillTableId(savedMergedBill.getId(), table.getId());
-                    BillTable newBt = BillTable.builder()
-                            .id(newId)
-                            .bill(savedMergedBill)
-                            .table(table)
-                            .build();
-                    savedMergedBill.getBillTables().add(newBt);
-                }
+                Long originalId = bt.getOriginalBillId() != null ? bt.getOriginalBillId() : source.getId();
+                tableToOriginalBillId.put(bt.getTable(), originalId);
             });
+        }
 
-            // Mark source bill as merged
+        for (Bill source : sourceBills) {
             source.setStatus(BillStatus.MERGED);
             source.setClosedAt(LocalDateTime.now());
             source.getOrders().clear();
             source.getBillTables().clear();
             billRepository.save(source);
-
             log.info("Bill {} marked as MERGED", source.getId());
         }
 
-        // ── Calculate totals ──────────────────────────────────────────────────
+        billRepository.flush();
+
+        for (Map.Entry<RestaurantTable, Long> entry : tableToOriginalBillId.entrySet()) {
+            BillTable newBt = BillTable.builder()
+                    .id(new BillTable.BillTableId(savedMergedBill.getId(), entry.getKey().getId()))
+                    .bill(savedMergedBill)
+                    .table(entry.getKey())
+                    .originalBillId(entry.getValue())
+                    .build();
+            savedMergedBill.getBillTables().add(newBt);
+        }
+
         BigDecimal mergedTotal = savedMergedBill.getOrders().stream()
                 .flatMap(order -> order.getOrderDetails().stream())
                 .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
@@ -461,7 +373,6 @@ public class BillService {
 
         savedMergedBill.setTotalPrice(mergedTotal);
 
-        // ── Apply best available discount ─────────────────────────────────────
         DiscountService.DiscountCalculationResult best =
                 discountService.calculateBillDiscount(savedMergedBill);
         if (best.getDiscountId() != null) {
@@ -477,6 +388,26 @@ public class BillService {
                 result.getId(), billIds, result.getTotalPrice());
 
         return mapToResponse(result);
+    }
+
+    private BillResponse mapToResponse(Bill bill) {
+        return BillResponse.builder()
+                .id(bill.getId())
+                .totalPrice(bill.getTotalPrice())
+                .partySize(bill.getPartySize())
+                .discount(bill.getDiscount() != null ? discountMapper.toResponse(bill.getDiscount()) : null)
+                .discountAmount(bill.getDiscountAmount())
+                .finalPrice(bill.getFinalPrice())
+                .status(bill.getStatus())
+                .reservationId(bill.getReservation() != null ? bill.getReservation().getId() : null)
+                .paymentId(bill.getPayment() != null ? bill.getPayment().getId() : null)
+                .tableNumbers(bill.getTableNumbers())
+                .orders(bill.getOrders().stream()
+                        .map(this::mapOrderToResponse)
+                        .collect(Collectors.toList()))
+                .createdAt(bill.getCreatedAt())
+                .closedAt(bill.getClosedAt())
+                .build();
     }
 
     private OrderResponse mapOrderToResponse(Order order) {

@@ -29,6 +29,9 @@ public class BillTable {
     @JoinColumn(name = "table_id")
     private RestaurantTable table;
 
+    @Column(name = "original_bill_id")
+    private Long originalBillId;
+
     @Embeddable
     @Data
     @NoArgsConstructor
