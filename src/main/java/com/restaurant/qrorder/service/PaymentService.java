@@ -31,7 +31,7 @@ public class PaymentService {
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
 
-    @Value("${MOMO_NOTIFY_URL}")
+    @Value("${momo.notify-url}")
     private String notifyUrl;
 
     /**

@@ -2,6 +2,8 @@ package com.restaurant.qrorder.service;
 
 import com.restaurant.qrorder.domain.dto.response.ReservationResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -13,6 +15,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReservationMailService {
@@ -71,12 +74,17 @@ public class ReservationMailService {
     }
 
     /**
-     * Core send mail function
+     * Core send mail function.
+     * Skips silently when recipient is blank (customerEmail is optional).
+     * Logs errors instead of throwing — email failure must not roll back the transaction.
      */
     private void sendMail(String to, String subject, String htmlContent) {
+        if (to == null || to.isBlank()) {
+            log.warn("Skipping email '{}': recipient address is empty", subject);
+            return;
+        }
 
         try {
-
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -88,7 +96,7 @@ public class ReservationMailService {
             mailSender.send(message);
 
         } catch (MessagingException e) {
-            throw new RuntimeException("Failed to send reservation email", e);
+            log.error("Failed to send email '{}' to {}: {}", subject, to, e.getMessage());
         }
     }
 
