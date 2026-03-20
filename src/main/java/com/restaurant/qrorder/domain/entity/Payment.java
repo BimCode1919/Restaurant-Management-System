@@ -29,7 +29,7 @@ public class Payment {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bill_id", nullable = false)
+    @JoinColumn(name = "bill_id", nullable = true)
     private Bill bill;
 
     @Enumerated(EnumType.STRING)

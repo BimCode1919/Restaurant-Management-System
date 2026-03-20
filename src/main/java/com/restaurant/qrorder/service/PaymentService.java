@@ -167,6 +167,7 @@ public class PaymentService {
                 .status(PaymentStatus.COMPLETED)
                 .transactionId("DEPOSIT_CASH_" + reservation.getId() + "_" + System.currentTimeMillis())
                 .paidAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 
@@ -195,6 +196,7 @@ public class PaymentService {
                 .momoOrderId(orderId)
                 .momoRequestId(requestId)
                 .paymentUrl(momoResult.getPayUrl())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 
