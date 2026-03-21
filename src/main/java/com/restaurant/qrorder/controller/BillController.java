@@ -3,6 +3,7 @@ package com.restaurant.qrorder.controller;
 import com.restaurant.qrorder.domain.common.BillStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateBillRequest;
 import com.restaurant.qrorder.domain.dto.request.MergeBillRequest;
+import com.restaurant.qrorder.domain.dto.request.SplitBillRequest;
 import com.restaurant.qrorder.domain.dto.request.UnmergeBillRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.BillResponse;
@@ -157,6 +158,19 @@ public class BillController {
                 ApiResponse.<List<BillResponse>>builder()
                         .statusCode(HttpStatus.OK.value())
                         .message("Bill unmerged successfully")
+                        .data(response)
+                        .build());
+    }
+
+    @PostMapping("/split")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
+    @Operation(summary = "Split bill by items", description = "Move selected items to a new bill on an available table")
+    public ResponseEntity<ApiResponse<List<BillResponse>>> splitBill(@Valid @RequestBody SplitBillRequest request) {
+        List<BillResponse> response = billService.splitBill(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<List<BillResponse>>builder()
+                        .statusCode(HttpStatus.CREATED.value())
+                        .message("Bill split successfully")
                         .data(response)
                         .build());
     }
