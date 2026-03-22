@@ -3,10 +3,7 @@ package com.restaurant.qrorder.service;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateTableRequest;
 import com.restaurant.qrorder.domain.dto.request.UpdateTableRequest;
-import com.restaurant.qrorder.domain.dto.response.BillResponse;
-import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
-import com.restaurant.qrorder.domain.dto.response.OrderResponse;
-import com.restaurant.qrorder.domain.dto.response.TableResponse;
+import com.restaurant.qrorder.domain.dto.response.*;
 import com.restaurant.qrorder.domain.entity.*;
 import com.restaurant.qrorder.exception.custom.DuplicateResourceException;
 import com.restaurant.qrorder.exception.custom.InvalidOperationException;
@@ -21,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -77,6 +75,99 @@ public class TableService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<TableAvailabilityResponse> getAvailableTables(
+            LocalDateTime reservationDate,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        // ─── Validate input ───────────────────────────────────────────────────────
+        if (!endTime.isAfter(startTime)) {
+            throw new InvalidOperationException("End time must be after start time");
+        }
+
+        long durationMinutes = java.time.Duration.between(startTime, endTime).toMinutes();
+        if (durationMinutes < 30) {
+            throw new InvalidOperationException("Duration must be at least 30 minutes");
+        }
+
+        // ─── Business hours check ─────────────────────────────────────────────────
+        if (startTime.getHour() < 9 || endTime.getHour() >= 22) {
+            throw new InvalidOperationException(
+                    "Reservations only available between 09:00 and 22:00");
+        }
+
+        List<RestaurantTable> available = tableRepository.findAvailableTables(
+                reservationDate,
+                startTime,
+                endTime
+        );
+
+        log.info("Found {} available tables for date: {}, {}–{}",
+                available.size(), reservationDate.toLocalDate(), startTime, endTime);
+
+        return available.stream()
+                .map(this::mapToAvailabilityResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TableAvailabilityResponse> getAllTablesWithAvailability(
+            LocalDateTime reservationDate,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        // ✅ Validate input
+        validateTimeSlot(startTime, endTime);
+
+        // ─── Get ALL tables ───────────────────────────────────────────────────────
+        List<RestaurantTable> allTables = tableRepository.findAllTables();
+
+        // ─── Get available table IDs for the requested slot ───────────────────────
+        Set<Long> availableIds = tableRepository
+                .findAvailableTables(reservationDate, startTime, endTime)
+                .stream()
+                .map(RestaurantTable::getId)
+                .collect(Collectors.toSet());
+
+        // ─── Map — if not in availableIds → show as RESERVED ─────────────────────
+        return allTables.stream()
+                .map(table -> {
+                    boolean isAvailable = availableIds.contains(table.getId())
+                            && table.getStatus() != TableStatus.MAINTENANCE;
+
+                    return TableAvailabilityResponse.builder()
+                            .id(table.getId())
+                            .tableNumber(table.getTableNumber())
+                            .capacity(table.getCapacity())
+                            .location(table.getLocation())
+                            .qrCode(table.getQrCode())
+                            .status(isAvailable
+                                    ? TableStatus.AVAILABLE        // ✅ free for this slot
+                                    : table.getStatus() == TableStatus.MAINTENANCE
+                                    ? TableStatus.MAINTENANCE  // ✅ keep maintenance as-is
+                                    : TableStatus.RESERVED)    // ✅ booked for this slot
+                            .available(isAvailable)
+                            .build();
+                })
+                .toList();
+    }
+
+    private void validateTimeSlot(LocalTime startTime, LocalTime endTime) {
+        if (startTime == null || endTime == null) {
+            throw new InvalidOperationException("startTime and endTime are required");
+        }
+        if (!endTime.isAfter(startTime)) {
+            throw new InvalidOperationException("endTime must be after startTime");
+        }
+        if (Duration.between(startTime, endTime).toMinutes() < 30) {
+            throw new InvalidOperationException("Slot must be at least 30 minutes");
+        }
+        if (startTime.getHour() < 9 || endTime.getHour() >= 22) {
+            throw new InvalidOperationException(
+                    "Reservations only available between 09:00 and 22:00");
+        }
+    }
     /**
      * Get table by ID
      */
@@ -340,4 +431,16 @@ public class TableService {
                 .notes(detail.getNote())
                 .build();
     }
+
+    private TableAvailabilityResponse mapToAvailabilityResponse(RestaurantTable table) {
+        return TableAvailabilityResponse.builder()
+                .id(table.getId())
+                .tableNumber(table.getTableNumber())
+                .capacity(table.getCapacity())
+                .location(table.getLocation())
+                .status(table.getStatus())
+                .available(true)
+                .build();
+    }
+
 }

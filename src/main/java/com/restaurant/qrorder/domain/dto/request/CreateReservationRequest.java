@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -54,6 +55,12 @@ public class CreateReservationRequest {
     // Optional: pre-order items. Presence triggers deposit requirement.
     @Valid
     private List<PreOrderItemRequest> preOrderItems;
+
+    @NotNull(message = "Reservation start time is required")
+    private LocalTime startTime;
+
+    @NotNull(message = "Reservation end time is required")
+    private LocalTime endTime;
 
     @Data
     @Builder
