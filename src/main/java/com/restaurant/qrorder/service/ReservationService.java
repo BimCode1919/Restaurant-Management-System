@@ -78,7 +78,7 @@ public class ReservationService {
                 0L);
 
         // 3. Resolve the authenticated user (no more hardcoded userId=1)
-        User user = resolveUser(creatorEmail);
+        User user = resolveUserOptional(creatorEmail);
 
         // 4. Resolve pre-order items and compute subtotal
         List<ResolvedPreOrderItem> resolvedItems =
@@ -432,11 +432,12 @@ public class ReservationService {
     // PRIVATE HELPERS
     // ═════════════════════════════════════════════════════════════════════════
 
-    private User resolveUser(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+    private User resolveUserOptional(String email) {
+        if (email == null || email.isBlank() || email.equals("anonymousUser")) {
+            return null; // guest booking — no user required
+        }
+        return userRepository.findByEmail(email).orElse(null); // soft fail for guests
     }
-
     private Reservation getReservationById(Long id) {
         return reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
