@@ -101,7 +101,7 @@ public class Reservation {
     private List<RestaurantTable> tables = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @JoinColumn(name = "created_by", nullable = true)
     private User createdBy;
 
     @Column(name = "start_time")
