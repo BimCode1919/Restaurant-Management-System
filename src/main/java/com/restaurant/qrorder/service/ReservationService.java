@@ -34,7 +34,7 @@ public class ReservationService {
     private static final BigDecimal DEPOSIT_RATE     = new BigDecimal("0.10");
     private static final int        DINING_HOURS     = 2;
     private static final int        LARGE_GROUP_SIZE = 10;
-
+    private static final Long        DEFAULT_ACCOUNT_ID = 8L;
     // ─── Dependencies ─────────────────────────────────────────────────────────
     private final ReservationRepository     reservationRepository;
     private final RestaurantTableRepository tableRepository;
@@ -80,6 +80,14 @@ public class ReservationService {
         // 3. Resolve the authenticated user (no more hardcoded userId=1)
         User user = resolveUserOptional(creatorEmail);
 
+        if (user == null) {
+            // ✅ findById actually hits DB and verifies the user exists
+            user = userRepository.findById(DEFAULT_ACCOUNT_ID)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Default guest account not found. Please ensure user ID "
+                                    + DEFAULT_ACCOUNT_ID + " exists in the system."));
+        }
+
         // 4. Resolve pre-order items and compute subtotal
         List<ResolvedPreOrderItem> resolvedItems =
                 resolvePreOrderItems(request.getPreOrderItems());
@@ -96,6 +104,8 @@ public class ReservationService {
         BigDecimal depositAmount = requiresDeposit
                 ? calculateDeposit(preOrderTotal, tables.size())
                 : null;
+
+
 
         // 6. Persist Reservation
         Reservation reservation = Reservation.builder()
