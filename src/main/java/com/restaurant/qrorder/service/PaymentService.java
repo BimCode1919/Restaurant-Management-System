@@ -30,6 +30,7 @@ public class PaymentService {
     private final MoMoPaymentService moMoPaymentService;
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+    private final PaymentMailService paymentMailService;
 
     @Value("${momo.notify-url}")
     private String notifyUrl;
@@ -428,6 +429,8 @@ public class PaymentService {
         Payment payment = paymentRepository.findByBillId(bill.getId())
                 .orElseThrow(() -> new RuntimeException("No payment found for reservation"));
 
+        PaymentResponse paymentResponse = null;
+
         // ─── If MoMo and still pending — query MoMo live ─────────────────────────
         if (PaymentMethod.MOMO.equals(payment.getMethod())
                 && payment.getStatus() == PaymentStatus.PENDING) {
@@ -437,6 +440,7 @@ public class PaymentService {
                             payment.getMomoOrderId(),
                             payment.getMomoRequestId()
                     );
+
 
             if (momoStatus.isCompleted()) {
                 // Payment confirmed by MoMo — update everything
@@ -452,6 +456,8 @@ public class PaymentService {
                     reservation.setDepositPaid(true);
                 }
                 reservationRepository.save(reservation);
+                paymentResponse = mapToResponse(payment);
+                paymentMailService.sendPaymentSuccessMail(reservation.getCustomerEmail(), paymentResponse);
 
                 log.info("Deposit confirmed via poll — reservation [ID:{}] now CONFIRMED",
                         reservationId);
@@ -471,9 +477,10 @@ public class PaymentService {
 
             reservation.setDepositPaid(true);
             reservationRepository.save(reservation);
+            paymentResponse = mapToResponse(payment);
         }
 
-        return mapToResponse(payment);
+        return paymentResponse;
     }
     /**
      * Process refund
