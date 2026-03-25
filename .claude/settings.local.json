@@ -3,7 +3,9 @@
     "allow": [
       "Bash(xargs grep:*)",
       "Bash(./mvnw compile:*)",
-      "Bash(cmd /c \"mvn compile -q 2>&1\")"
+      "Bash(cmd /c \"mvn compile -q 2>&1\")",
+      "Bash(find /f/dev/java/sp26/swd -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js -o -name package.json \\\\\\))",
+      "Bash(grep -r \"upload\\\\|multipart\\\\|FileUpload\\\\|MultipartFile\" /f/dev/java/sp26/swd/src/main/java --include=*.java)"
     ]
   }
 }
