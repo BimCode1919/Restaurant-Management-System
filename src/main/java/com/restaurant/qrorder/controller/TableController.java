@@ -4,6 +4,7 @@ import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateTableRequest;
 import com.restaurant.qrorder.domain.dto.request.UpdateTableRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
+import com.restaurant.qrorder.domain.dto.response.TableAvailabilityResponse;
 import com.restaurant.qrorder.domain.dto.response.TableResponse;
 import com.restaurant.qrorder.service.TableService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +21,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -160,5 +163,54 @@ public class TableController {
                         .statusCode(HttpStatus.OK.value())
                         .message("Table deleted successfully")
                         .build());
+    }
+
+    @GetMapping("/available/date")
+    @Operation(summary = "Get available tables",
+            description = "Returns tables with no conflict and 2-hour buffer for the requested slot")
+    public ResponseEntity<ApiResponse<List<TableAvailabilityResponse>>> getAvailableTables(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime reservationDate,
+
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
+            LocalTime startTime,
+
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
+            LocalTime endTime) {
+
+        List<TableAvailabilityResponse> tables =
+                tableService.getAvailableTables(reservationDate, startTime, endTime);
+
+        return ResponseEntity.ok(
+                    ApiResponse.<List<TableAvailabilityResponse>>builder()
+                        .statusCode(200)
+                        .message("Available tables retrieved")
+                        .data(tables)
+                        .build()
+        );
+    }
+
+    @GetMapping("/all_table_available")
+    @Operation(summary = "Get all tables with availability status",
+            description = "Returns all tables — unavailable ones shown as RESERVED for the requested slot")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
+    public ResponseEntity<ApiResponse<List<TableAvailabilityResponse>>> getAllTables(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime reservationDate,
+
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
+            LocalTime startTime,
+
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
+            LocalTime endTime) {
+
+        List<TableAvailabilityResponse> tables =
+                tableService.getAllTablesWithAvailability(reservationDate, startTime, endTime);
+
+        return ResponseEntity.ok(ApiResponse.<List<TableAvailabilityResponse>>builder()
+                .statusCode(200)
+                .message("Tables retrieved successfully")
+                .data(tables)
+                .build());
     }
 }

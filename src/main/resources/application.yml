@@ -2,8 +2,7 @@ spring:
 #  profiles:
 #    active: local
   application:
-    name: restaurant-qr-order
-
+    name: restaurant-qr-db
   datasource:
     url: jdbc:postgresql://localhost:5432/restaurant_qr_db
     username: restaurant_user

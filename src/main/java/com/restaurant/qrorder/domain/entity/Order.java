@@ -48,7 +48,7 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "original_bill_id",nullable = false)
+    @Column(name = "original_bill_id",nullable = true)
     private Long originalBillId;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)

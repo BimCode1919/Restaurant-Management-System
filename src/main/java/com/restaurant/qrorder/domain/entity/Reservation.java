@@ -2,14 +2,12 @@ package com.restaurant.qrorder.domain.entity;
 
 import com.restaurant.qrorder.domain.common.ReservationStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +17,8 @@ import java.util.List;
     @Index(name = "idx_status", columnList = "status"),
     @Index(name = "idx_customer_phone", columnList = "customer_phone")
 })
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -100,8 +99,14 @@ public class Reservation {
     private List<RestaurantTable> tables = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @JoinColumn(name = "created_by", nullable = true)
     private User createdBy;
+
+    @Column(name = "start_time")
+    private LocalTime startTime;
+
+    @Column(name = "end_time")
+    private LocalTime endTime;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -162,12 +162,12 @@ public class PaymentService {
         billRepository.save(bill);
 
         return Payment.builder()
-                .bill(bill)
                 .method(PaymentMethod.CASH)
                 .amount(amount)
                 .status(PaymentStatus.COMPLETED)
                 .transactionId("DEPOSIT_CASH_" + reservation.getId() + "_" + System.currentTimeMillis())
                 .paidAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 
@@ -197,6 +197,7 @@ public class PaymentService {
                 .momoOrderId(orderId)
                 .momoRequestId(requestId)
                 .paymentUrl(momoResult.getPayUrl())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 

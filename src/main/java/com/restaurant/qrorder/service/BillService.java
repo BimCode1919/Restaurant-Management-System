@@ -1,8 +1,11 @@
 package com.restaurant.qrorder.service;
 
 import com.restaurant.qrorder.domain.common.BillStatus;
+import com.restaurant.qrorder.domain.common.ItemStatus;
+import com.restaurant.qrorder.domain.common.OrderType;
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.dto.request.CreateBillRequest;
+import com.restaurant.qrorder.domain.dto.request.SplitBillRequest;
 import com.restaurant.qrorder.domain.dto.response.BillResponse;
 import com.restaurant.qrorder.domain.dto.response.DiscountResponse;
 import com.restaurant.qrorder.domain.dto.response.OrderDetailResponse;
@@ -388,6 +391,122 @@ public class BillService {
                 result.getId(), billIds, result.getTotalPrice());
 
         return mapToResponse(result);
+    }
+
+    @Transactional
+    public List<BillResponse> splitBill(SplitBillRequest request) {
+        log.info("Splitting {} items off bill {}", request.getOrderDetailIds().size(), request.getBillId());
+
+        Bill originalBill = getBillById(request.getBillId());
+
+        if (originalBill.getStatus() != BillStatus.OPEN) {
+            throw new InvalidOperationException("Can only split OPEN bills");
+        }
+
+        if (originalBill.getOrders().isEmpty()) {
+            throw new InvalidOperationException("Bill has no orders to split");
+        }
+
+        Map<Long, OrderDetail> allDetails = originalBill.getOrders().stream()
+                .flatMap(o -> o.getOrderDetails().stream())
+                .collect(Collectors.toMap(OrderDetail::getId, d -> d));
+
+        for (SplitBillRequest.SplitItem splitItem : request.getOrderDetailIds()) {
+            OrderDetail detail = allDetails.get(splitItem.getOrderDetailId());
+            if (detail == null) {
+                throw new InvalidOperationException(
+                        "OrderDetail ID " + splitItem.getOrderDetailId() + " does not belong to bill " + request.getBillId());
+            }
+            if (detail.getItemStatus() == ItemStatus.CANCELLED || detail.getItemStatus() == ItemStatus.SERVED) {
+                throw new InvalidOperationException(
+                        "Cannot split item with status " + detail.getItemStatus() + ": ID " + splitItem.getOrderDetailId());
+            }
+            if (splitItem.getQuantity() > detail.getQuantity()) {
+                throw new InvalidOperationException(
+                        "Cannot split " + splitItem.getQuantity() + " of item " + splitItem.getOrderDetailId()
+                                + " — only " + detail.getQuantity() + " available");
+            }
+        }
+
+        List<RestaurantTable> availableTables = tableRepository.findByStatus(TableStatus.AVAILABLE);
+        if (availableTables.isEmpty()) {
+            throw new InvalidOperationException("No available tables to assign to the new split bill");
+        }
+        RestaurantTable assignedTable = availableTables.get(0);
+
+        Bill newBill = Bill.builder()
+                .totalPrice(BigDecimal.ZERO)
+                .partySize(1)
+                .discountAmount(BigDecimal.ZERO)
+                .finalPrice(BigDecimal.ZERO)
+                .status(BillStatus.OPEN)
+                .billTables(new ArrayList<>())
+                .orders(new ArrayList<>())
+                .build();
+
+        Bill savedNewBill = billRepository.save(newBill);
+
+        BillTable billTable = BillTable.builder()
+                .id(new BillTable.BillTableId(savedNewBill.getId(), assignedTable.getId()))
+                .bill(savedNewBill)
+                .table(assignedTable)
+                .build();
+        savedNewBill.getBillTables().add(billTable);
+        assignedTable.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(assignedTable);
+
+        Order newOrder = Order.builder()
+                .bill(savedNewBill)
+                .orderType(originalBill.getOrders().stream().findFirst()
+                        .map(Order::getOrderType).orElse(OrderType.AT_TABLE))
+                .createdBy(originalBill.getOrders().stream().findFirst()
+                        .map(Order::getCreatedBy).orElse(null))
+                .orderDetails(new ArrayList<>())
+                .build();
+
+        BigDecimal splitTotal = BigDecimal.ZERO;
+
+        for (SplitBillRequest.SplitItem splitItem : request.getOrderDetailIds()) {
+            OrderDetail original = allDetails.get(splitItem.getOrderDetailId());
+            int splitQty = splitItem.getQuantity();
+
+            if (splitQty == original.getQuantity()) {
+                original.setOrder(newOrder);
+                newOrder.getOrderDetails().add(original);
+            } else {
+                original.setQuantity(original.getQuantity() - splitQty);
+
+                OrderDetail splitDetail = OrderDetail.builder()
+                        .order(newOrder)
+                        .item(original.getItem())
+                        .quantity(splitQty)
+                        .price(original.getPrice())
+                        .note(original.getNote())
+                        .itemStatus(original.getItemStatus())
+                        .build();
+                newOrder.getOrderDetails().add(splitDetail);
+            }
+
+            splitTotal = splitTotal.add(original.getPrice().multiply(BigDecimal.valueOf(splitQty)));
+        }
+
+        savedNewBill.getOrders().add(newOrder);
+        savedNewBill.setTotalPrice(splitTotal);
+        savedNewBill.setFinalPrice(splitTotal);
+        billRepository.save(savedNewBill);
+
+        log.info("New bill {} created with {} items on table {}",
+                savedNewBill.getId(), request.getOrderDetailIds().size(), assignedTable.getTableNumber());
+
+        recalculateBill(originalBill.getId());
+
+        log.info("Split complete — original bill {} updated, new bill {} created",
+                request.getBillId(), savedNewBill.getId());
+
+        return List.of(
+                getBillResponseById(originalBill.getId()),
+                mapToResponse(savedNewBill)
+        );
     }
 
     private BillResponse mapToResponse(Bill bill) {

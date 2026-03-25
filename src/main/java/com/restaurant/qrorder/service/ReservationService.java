@@ -34,7 +34,7 @@ public class ReservationService {
     private static final BigDecimal DEPOSIT_RATE     = new BigDecimal("0.10");
     private static final int        DINING_HOURS     = 2;
     private static final int        LARGE_GROUP_SIZE = 10;
-
+    private static final Long        DEFAULT_ACCOUNT_ID = 8L;
     // ─── Dependencies ─────────────────────────────────────────────────────────
     private final ReservationRepository     reservationRepository;
     private final RestaurantTableRepository tableRepository;
@@ -78,7 +78,15 @@ public class ReservationService {
                 0L);
 
         // 3. Resolve the authenticated user (no more hardcoded userId=1)
-        User user = resolveUser(creatorEmail);
+        User user = resolveUserOptional(creatorEmail);
+
+        if (user == null) {
+            // ✅ findById actually hits DB and verifies the user exists
+            user = userRepository.findById(DEFAULT_ACCOUNT_ID)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Default guest account not found. Please ensure user ID "
+                                    + DEFAULT_ACCOUNT_ID + " exists in the system."));
+        }
 
         // 4. Resolve pre-order items and compute subtotal
         List<ResolvedPreOrderItem> resolvedItems =
@@ -96,6 +104,8 @@ public class ReservationService {
         BigDecimal depositAmount = requiresDeposit
                 ? calculateDeposit(preOrderTotal, tables.size())
                 : null;
+
+
 
         // 6. Persist Reservation
         Reservation reservation = Reservation.builder()
@@ -432,11 +442,12 @@ public class ReservationService {
     // PRIVATE HELPERS
     // ═════════════════════════════════════════════════════════════════════════
 
-    private User resolveUser(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+    private User resolveUserOptional(String email) {
+        if (email == null || email.isBlank() || email.equals("anonymousUser")) {
+            return null; // guest booking — no user required
+        }
+        return userRepository.findByEmail(email).orElse(null); // soft fail for guests
     }
-
     private Reservation getReservationById(Long id) {
         return reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
