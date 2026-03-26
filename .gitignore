@@ -42,3 +42,5 @@ logs/
 ### Environment ###
 .env
 .env.local
+
+.claude

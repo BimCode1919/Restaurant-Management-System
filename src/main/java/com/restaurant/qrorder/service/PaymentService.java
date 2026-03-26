@@ -191,6 +191,7 @@ public class PaymentService {
         }
 
         return Payment.builder()
+                .bill(bill)
                 .method(PaymentMethod.MOMO)
                 .amount(amount)
                 .status(PaymentStatus.PENDING)
