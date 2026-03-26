@@ -5,5 +5,6 @@ public enum PaymentStatus {
     PROCESSING,     // Đang xử lý (cho online payment)
     COMPLETED,      // Đã thanh toán thành công
     FAILED,         // Thanh toán thất bại
+    COMPLETE_DEPOSIT, // DEPOSIT thanh toán thành công
     REFUNDED        // Đã hoàn tiền
 }

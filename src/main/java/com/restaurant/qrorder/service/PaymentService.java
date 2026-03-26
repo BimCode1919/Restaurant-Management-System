@@ -165,7 +165,7 @@ public class PaymentService {
         return Payment.builder()
                 .method(PaymentMethod.CASH)
                 .amount(amount)
-                .status(PaymentStatus.COMPLETED)
+                .status(PaymentStatus.COMPLETE_DEPOSIT)
                 .transactionId("DEPOSIT_CASH_" + reservation.getId() + "_" + System.currentTimeMillis())
                 .paidAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
@@ -445,7 +445,8 @@ public class PaymentService {
 
             if (momoStatus.isCompleted()) {
                 // Payment confirmed by MoMo — update everything
-                payment.markAsPaid();
+                payment.setStatus(PaymentStatus.COMPLETE_DEPOSIT);
+                payment.setPaidAt(LocalDateTime.now());
                 payment.setMomoTransId(momoStatus.getTransId());
                 payment.setTransactionId(momoStatus.getTransId());
                 paymentRepository.save(payment);
