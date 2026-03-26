@@ -30,6 +30,7 @@ public class PaymentService {
     private final MoMoPaymentService moMoPaymentService;
     private final RestaurantTableRepository tableRepository;
     private final ReservationRepository reservationRepository;
+    private final PaymentMailService paymentMailService;
 
     @Value("${momo.notify-url}")
     private String notifyUrl;
@@ -164,7 +165,7 @@ public class PaymentService {
         return Payment.builder()
                 .method(PaymentMethod.CASH)
                 .amount(amount)
-                .status(PaymentStatus.COMPLETED)
+                .status(PaymentStatus.COMPLETE_DEPOSIT)
                 .transactionId("DEPOSIT_CASH_" + reservation.getId() + "_" + System.currentTimeMillis())
                 .paidAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
@@ -429,6 +430,8 @@ public class PaymentService {
         Payment payment = paymentRepository.findByBillId(bill.getId())
                 .orElseThrow(() -> new RuntimeException("No payment found for reservation"));
 
+        PaymentResponse paymentResponse = null;
+
         // ─── If MoMo and still pending — query MoMo live ─────────────────────────
         if (PaymentMethod.MOMO.equals(payment.getMethod())
                 && payment.getStatus() == PaymentStatus.PENDING) {
@@ -439,9 +442,11 @@ public class PaymentService {
                             payment.getMomoRequestId()
                     );
 
+
             if (momoStatus.isCompleted()) {
                 // Payment confirmed by MoMo — update everything
-                payment.markAsPaid();
+                payment.setStatus(PaymentStatus.COMPLETE_DEPOSIT);
+                payment.setPaidAt(LocalDateTime.now());
                 payment.setMomoTransId(momoStatus.getTransId());
                 payment.setTransactionId(momoStatus.getTransId());
                 paymentRepository.save(payment);
@@ -453,6 +458,8 @@ public class PaymentService {
                     reservation.setDepositPaid(true);
                 }
                 reservationRepository.save(reservation);
+                paymentResponse = mapToResponse(payment);
+                paymentMailService.sendPaymentSuccessMail(reservation.getCustomerEmail(), paymentResponse);
 
                 log.info("Deposit confirmed via poll — reservation [ID:{}] now CONFIRMED",
                         reservationId);
@@ -472,9 +479,10 @@ public class PaymentService {
 
             reservation.setDepositPaid(true);
             reservationRepository.save(reservation);
+            paymentResponse = mapToResponse(payment);
         }
 
-        return mapToResponse(payment);
+        return paymentResponse;
     }
     /**
      * Process refund
