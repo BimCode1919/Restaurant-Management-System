@@ -344,9 +344,8 @@ public class TableService {
      * Map entity to response DTO
      */
     private TableResponse mapToResponse(RestaurantTable table) {
-        Bill currentBill = billRepository
-                .findCurrentBillByTableId(table.getId())
-                .orElse(null);
+        List<Bill> openBills = billRepository.findCurrentBillByTableId(table.getId());
+        Bill currentBill = openBills.isEmpty() ? null : openBills.get(0);
 
         return TableResponse.builder()
                 .id(table.getId())
