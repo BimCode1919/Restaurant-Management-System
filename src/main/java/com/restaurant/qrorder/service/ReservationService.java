@@ -145,11 +145,9 @@ public class ReservationService {
             createPreOrders(savedBill, resolvedItems, user, saved);
         }
 
-        // 12. Mark tables RESERVED only when deposit is required
-        if (requiresDeposit) {
-            tables.forEach(t -> t.setStatus(TableStatus.RESERVED));
-            tableRepository.saveAll(tables);
-        }
+        // 12. Table status is managed by the scheduled job (autoReserveTablesBeforeReservation)
+        //     which sets RESERVED 2 hours before the reservation time.
+        //     Do NOT set RESERVED immediately here — it would block other time slots.
 
         log.info("Created reservation [ID:{}] customer:{} requiresDeposit:{} depositAmount:{}",
                 saved.getId(), saved.getCustomerName(), requiresDeposit, depositAmount);
@@ -499,7 +497,7 @@ public class ReservationService {
 
         // Auto-assign: find available tables in the time window
         List<RestaurantTable> available =
-                tableRepository.findAvailableTablesForTimePeriod(startTime, endTime);
+                tableRepository.findAvailableTablesForTimePeriod(startTime, endTime, startMinus2h);
         if (available.isEmpty()) {
             throw new InvalidOperationException(
                     "No tables available at the requested time");

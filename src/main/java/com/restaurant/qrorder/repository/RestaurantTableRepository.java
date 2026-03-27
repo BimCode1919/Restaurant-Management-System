@@ -28,16 +28,18 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     @Query("SELECT t FROM RestaurantTable t WHERE t.status = 'AVAILABLE'")
     List<RestaurantTable> findAvailableTables();
 
-    // Find tables available for a specific time period
-    @Query("SELECT t FROM RestaurantTable t WHERE t.status = 'AVAILABLE' " +
+    // Find tables available for a specific time period (time-based conflict check, not status-based)
+    @Query("SELECT t FROM RestaurantTable t WHERE t.status != 'MAINTENANCE' " +
            "AND t.id NOT IN (" +
            "  SELECT rt.id FROM Reservation r JOIN r.tables rt " +
-           "  WHERE r.status IN ('CONFIRMED', 'SEATED') " +
-           "  AND r.reservationTime BETWEEN :start AND :end" +
+           "  WHERE r.status IN ('PENDING', 'CONFIRMED', 'SEATED') " +
+           "  AND r.reservationTime < :end " +
+           "  AND r.reservationTime > :startMinus2h" +
            ")")
     List<RestaurantTable> findAvailableTablesForTimePeriod(
             @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
+            @Param("end") LocalDateTime end,
+            @Param("startMinus2h") LocalDateTime startMinus2h
     );
 
     @Query("""

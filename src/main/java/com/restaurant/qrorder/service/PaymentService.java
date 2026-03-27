@@ -55,15 +55,15 @@ public class PaymentService {
             throw new RuntimeException("Bill has been merged into another bill and cannot be paid directly");
         }
 
-        // Check if payment already exists
-        paymentRepository.findByBillId(bill.getId())
-                .ifPresent(existingPayment -> {
-                    if (existingPayment.getStatus() == PaymentStatus.COMPLETED) {
-                        throw new RuntimeException("Bill already has a completed payment");
-                    }
-                    // Delete pending/failed payments to create new one
-                    paymentRepository.delete(existingPayment);
-                });
+        // Check if a non-deposit payment already exists — deposit can coexist on the same bill
+        for (Payment existing : paymentRepository.findByBillId(bill.getId())) {
+            if (!isDepositPayment(existing)) {
+                if (existing.getStatus() == PaymentStatus.COMPLETED) {
+                    throw new RuntimeException("Bill already has a completed payment");
+                }
+                paymentRepository.delete(existing);
+            }
+        }
 
         // Get amount from bill
         BigDecimal amount = bill.getFinalPrice();
@@ -124,14 +124,15 @@ public class PaymentService {
             throw new InvalidOperationException("Invalid deposit amount on reservation");
         }
 
-        // ─── Check for existing payment ───────────────────────────────────────────
-        paymentRepository.findByBillId(bill.getId())
-                .ifPresent(existing -> {
-                    if (existing.getStatus() == PaymentStatus.COMPLETED) {
-                        throw new InvalidOperationException("Deposit already paid");
-                    }
-                    paymentRepository.delete(existing); // delete pending/failed, allow retry
-                });
+        // ─── Check for existing deposit payment only ──────────────────────────────
+        for (Payment existing : paymentRepository.findByBillId(bill.getId())) {
+            if (isDepositPayment(existing)) {
+                if (existing.getStatus() == PaymentStatus.COMPLETED) {
+                    throw new InvalidOperationException("Deposit already paid");
+                }
+                paymentRepository.delete(existing); // delete pending/failed, allow retry
+            }
+        }
 
         // ─── Create payment by method ─────────────────────────────────────────────
         Payment payment;
@@ -153,16 +154,12 @@ public class PaymentService {
     }
 
     private Payment createDepositCashPayment(Bill bill, Reservation reservation, BigDecimal amount) {
-        // Mark deposit as paid on reservation
+        // Mark deposit as paid on reservation — bill stays OPEN for final dining payment
         reservation.setDepositPaid(true);
         reservationRepository.save(reservation);
 
-        // Update bill
-        bill.setStatus(BillStatus.PAID);
-        bill.setClosedAt(LocalDateTime.now());
-        billRepository.save(bill);
-
         return Payment.builder()
+                .bill(bill)
                 .method(PaymentMethod.CASH)
                 .amount(amount)
                 .status(PaymentStatus.COMPLETE_DEPOSIT)
@@ -221,8 +218,10 @@ public class PaymentService {
         }
 
         Bill bill = reservation.getBill();
-        Payment depositPayment = paymentRepository.findByBillId(bill.getId())
-                .orElseThrow(() -> new RuntimeException("No payment found for reservation bill"));
+        Payment depositPayment = paymentRepository.findByBillId(bill.getId()).stream()
+                .filter(this::isDepositPayment)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No deposit payment found for reservation bill"));
 
         if (depositPayment.getStatus() != PaymentStatus.COMPLETED) {
             throw new InvalidOperationException("Deposit payment is not completed, cannot refund");
@@ -427,8 +426,10 @@ public class PaymentService {
             throw new InvalidOperationException("No bill linked to this reservation");
         }
 
-        Payment payment = paymentRepository.findByBillId(bill.getId())
-                .orElseThrow(() -> new RuntimeException("No payment found for reservation"));
+        Payment payment = paymentRepository.findByBillId(bill.getId()).stream()
+                .filter(this::isDepositPayment)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No deposit payment found for reservation"));
 
         PaymentResponse paymentResponse = null;
 
@@ -526,10 +527,10 @@ public class PaymentService {
     /**
      * Get payment by Bill ID
      */
-    public PaymentResponse getPaymentByBillId(Long billId) {
-        Payment payment = paymentRepository.findByBillId(billId)
-                .orElseThrow(() -> new RuntimeException("Payment not found for bill"));
-        return mapToResponse(payment);
+    public List<PaymentResponse> getPaymentsByBillId(Long billId) {
+        return paymentRepository.findByBillId(billId).stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     /**
@@ -573,6 +574,14 @@ public class PaymentService {
      */
     public boolean verifyMoMoSignature(java.util.Map<String, String> params, String signature) {
         return moMoPaymentService.verifySignature(params, signature);
+    }
+
+    /** Deposit payments are identified by their orderId/transactionId prefix. */
+    private boolean isDepositPayment(Payment p) {
+        String orderId = p.getMomoOrderId();
+        String txId    = p.getTransactionId();
+        return (orderId != null && orderId.startsWith("DEPOSIT_"))
+            || (txId    != null && txId.startsWith("DEPOSIT_CASH_"));
     }
 
     private PaymentResponse mapToResponse(Payment payment) {
