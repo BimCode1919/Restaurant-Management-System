@@ -480,7 +480,9 @@ public class ReservationService {
         LocalDateTime startMinus2h  = startTime.minusHours(DINING_HOURS);
 
         if (tableIds != null && !tableIds.isEmpty()) {
-            List<RestaurantTable> tables = tableRepository.findAllById(tableIds);
+            // Pessimistic lock: concurrent requests block here until the first transaction commits,
+            // preventing two users from booking the same table at the same time.
+            List<RestaurantTable> tables = tableRepository.findAllByIdWithLock(tableIds);
             if (tables.size() != tableIds.size()) {
                 throw new ResourceNotFoundException("One or more requested tables not found");
             }

@@ -28,8 +28,9 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
         JOIN b.billTables bt
         WHERE bt.table.id = :tableId
         AND b.status = 'OPEN'
+        ORDER BY b.createdAt DESC
     """)
-    Optional<Bill> findCurrentBillByTableId(Long tableId);
+    List<Bill> findCurrentBillByTableId(Long tableId);
 
     @Query("SELECT b FROM Bill b WHERE b.createdAt BETWEEN :startDate AND :endDate")
     List<Bill> findByDateRange(

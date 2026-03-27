@@ -2,7 +2,9 @@ package com.restaurant.qrorder.repository;
 
 import com.restaurant.qrorder.domain.common.TableStatus;
 import com.restaurant.qrorder.domain.entity.RestaurantTable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +19,12 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
 
     @Query("SELECT t FROM RestaurantTable t ORDER BY t.tableNumber ASC")
     List<RestaurantTable> findAllTables();
+
+    // Pessimistic write lock — used during reservation creation to prevent double-booking.
+    // Concurrent transactions will block here until the first one commits.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM RestaurantTable t WHERE t.id IN :ids")
+    List<RestaurantTable> findAllByIdWithLock(@Param("ids") List<Long> ids);
 
     Optional<RestaurantTable> findByTableNumber(String tableNumber);
 
