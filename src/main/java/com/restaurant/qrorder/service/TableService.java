@@ -373,7 +373,6 @@ public class TableService {
 
     private BillResponse mapToBillResponse(Bill bill) {
         if (bill == null) return null;
-
         return BillResponse.builder()
                 .id(bill.getId())
                 .totalPrice(bill.getTotalPrice())
@@ -395,6 +394,7 @@ public class TableService {
                         .collect(Collectors.toList()))
                 .createdAt(bill.getCreatedAt())
                 .closedAt(bill.getClosedAt())
+                .reservationResponses(mapReservationResponse(bill.getReservation()))
                 .build();
     }
 
@@ -415,6 +415,17 @@ public class TableService {
                 .createdAt(order.getCreatedAt())
                 .build();
     }
+
+
+    private ReservationTImeResponse mapReservationResponse(Reservation reservation) {
+
+        return ReservationTImeResponse.builder()
+                .reservationId(reservation.getId())
+                .startTime(reservation.getStartTime())
+                .endTime(reservation.getEndTime())
+                .build();
+    }
+
 
     private OrderDetailResponse mapOrderDetailToResponse(OrderDetail detail) {
         BigDecimal subtotal = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity()));

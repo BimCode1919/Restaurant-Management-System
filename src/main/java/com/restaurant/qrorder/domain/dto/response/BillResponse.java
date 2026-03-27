@@ -29,4 +29,6 @@ public class BillResponse {
     private List<OrderResponse> orders;
     private LocalDateTime createdAt;
     private LocalDateTime closedAt;
+    private ReservationTImeResponse reservationResponses;
+
 }
