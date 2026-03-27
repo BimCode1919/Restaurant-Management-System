@@ -121,6 +121,8 @@ public class ReservationService {
                 .depositPaid(false)
                 .createdBy(user)
                 .tables(tables)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
                 .build();
 
         Reservation saved = reservationRepository.save(reservation);
