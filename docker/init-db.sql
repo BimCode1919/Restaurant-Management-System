@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS ingredient_batches (
 -- Ingredient Usages table (tracks ingredient consumption per order detail)
 CREATE TABLE IF NOT EXISTS ingredient_usages (
     id BIGSERIAL PRIMARY KEY,
-    batch_id BIGINT NOT NULL REFERENCES ingredient_batches(id),
+    batch_id BIGINT REFERENCES ingredient_batches(id),
     order_detail_id BIGINT NOT NULL REFERENCES order_details(id) ON DELETE CASCADE,
     quantity_used DECIMAL(19,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
