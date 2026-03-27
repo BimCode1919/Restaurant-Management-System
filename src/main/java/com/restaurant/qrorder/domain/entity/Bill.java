@@ -15,7 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-@ToString(exclude = {"reservation","payment","orders","billTables"})
+@ToString(exclude = {"reservation","payments","orders","billTables"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Bill {
@@ -53,9 +53,10 @@ public class Bill {
     @JoinColumn(name = "reservation_id")
     private Reservation reservation;
 
-    // Payment information
-    @OneToOne(mappedBy = "bill", cascade = CascadeType.ALL)
-    private Payment payment;
+    // Payment information — a bill can have a deposit payment + a final payment
+    @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

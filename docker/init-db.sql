@@ -162,6 +162,9 @@ CREATE TABLE IF NOT EXISTS bills (
 );
 
 -- Payments table
+-- A bill can have multiple payment rows: one deposit payment + one final payment.
+-- Deposit payments have momo_order_id starting with 'DEPOSIT_' (MoMo)
+-- or transaction_id starting with 'DEPOSIT_CASH_' (cash).
 CREATE TABLE IF NOT EXISTS payments (
     id BIGSERIAL PRIMARY KEY,
     bill_id BIGINT NOT NULL REFERENCES bills(id),
@@ -184,8 +187,10 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- Create indexes for payments
+CREATE INDEX IF NOT EXISTS idx_payment_bill_id        ON payments(bill_id);
 CREATE INDEX IF NOT EXISTS idx_payment_transaction_id ON payments(transaction_id);
-CREATE INDEX IF NOT EXISTS idx_payment_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payment_status         ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payment_momo_order_id  ON payments(momo_order_id);
 
 -- Orders table
 CREATE TABLE IF NOT EXISTS orders (
@@ -422,6 +427,8 @@ COMMENT ON COLUMN bills.final_price IS 'Final price after discount';
 
 COMMENT ON COLUMN payments.method IS 'Payment method: CASH, MOMO, BANK_TRANSFER, CREDIT_CARD';
 COMMENT ON COLUMN payments.status IS 'Payment status: PENDING, COMPLETED, FAILED, REFUNDED';
+COMMENT ON COLUMN payments.bill_id IS 'A bill can have 2 payments: deposit (momo_order_id/transaction_id prefixed with DEPOSIT_) and final payment';
+COMMENT ON COLUMN payments.momo_order_id IS 'MoMo order ID. Deposit payments prefixed with DEPOSIT_, final payments with BILL_';
 
 COMMENT ON COLUMN reservations.status IS 'Reservation status: PENDING, CONFIRMED, SEATED, COMPLETED, NO_SHOW, CANCELLED';
 COMMENT ON COLUMN reservations.grace_period_minutes IS 'Minutes to wait after reservation time before marking as no-show';

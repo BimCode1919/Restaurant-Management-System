@@ -387,8 +387,8 @@ public class TableService {
                                 bill.getReservation().getId() : null
                 )
                 .paymentId(
-                        bill.getPayment() != null ?
-                                bill.getPayment().getId() : null
+                        bill.getPayments().isEmpty() ? null
+                                : bill.getPayments().get(bill.getPayments().size() - 1).getId()
                 )
                 .tableNumbers(bill.getTableNumbers())
                 .orders(bill.getOrders().stream()

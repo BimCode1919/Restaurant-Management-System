@@ -1,6 +1,7 @@
 package com.restaurant.qrorder.controller;
 
 import com.restaurant.qrorder.domain.common.PaymentMethod;
+import java.util.List;
 import com.restaurant.qrorder.domain.dto.request.CreatePaymentRequest;
 import com.restaurant.qrorder.domain.dto.response.ApiResponse;
 import com.restaurant.qrorder.domain.dto.response.PaymentResponse;
@@ -58,8 +59,8 @@ public class PaymentController {
     @GetMapping("/bill/{billId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Get payment by Bill ID", description = "Retrieve payment by bill ID (Admin/Staff only)")
-    public ResponseEntity<PaymentResponse> getPaymentByBillId(@PathVariable Long billId) {
-        PaymentResponse response = paymentService.getPaymentByBillId(billId);
+    public ResponseEntity<List<PaymentResponse>> getPaymentByBillId(@PathVariable Long billId) {
+        List<PaymentResponse> response = paymentService.getPaymentsByBillId(billId);
         return ResponseEntity.ok(response);
     }
 

@@ -519,7 +519,7 @@ public class BillService {
                 .finalPrice(bill.getFinalPrice())
                 .status(bill.getStatus())
                 .reservationId(bill.getReservation() != null ? bill.getReservation().getId() : null)
-                .paymentId(bill.getPayment() != null ? bill.getPayment().getId() : null)
+                .paymentId(bill.getPayments().isEmpty() ? null : bill.getPayments().get(bill.getPayments().size() - 1).getId())
                 .tableNumbers(bill.getTableNumbers())
                 .orders(bill.getOrders().stream()
                         .map(this::mapOrderToResponse)
