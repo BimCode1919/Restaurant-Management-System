@@ -175,7 +175,7 @@ public class DiscountController {
     }
 
     @PostMapping("/apply/{billId}/{discountId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER'、’CASHIER’)")
     @Operation(summary = "Apply discount to bill", 
                description = "Apply a specific discount to a bill")
     public ResponseEntity<ApiResponse<Void>> applyDiscountToBill(
@@ -192,7 +192,7 @@ public class DiscountController {
     }
 
     @PostMapping("/apply-best/{billId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'MANAGER', 'CASHIER')")
     @Operation(summary = "Apply best discount to bill", 
                description = "Automatically find and apply the best discount to a bill")
     public ResponseEntity<ApiResponse<Void>> applyBestDiscount(@PathVariable Long billId) {
